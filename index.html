@@ -2150,7 +2150,7 @@ function tJa(a){
   const rows=[], T=(a.tasks||[]).filter(t=>t.text);
   if(T.length&&pOn('ja','tasks')){ rows.push(sec('งานที่ต้องทำ ('+T.length+' งาน)')); T.forEach((t,i)=>rows.push([i+1,'',t.text+(t.who?'  → '+t.who.name:''),'','','',t.done?'เสร็จแล้ว':''])); }
   if((a.lines||[]).length&&pOn('ja','mats')){ rows.push(sec('รายการวัสดุที่ต้องเบิก ('+(a.lines||[]).length+' รายการ)')); let n=0; catSections(a.lines||[]).forEach(cs=>{ const r=['',catLabel(cs.cat),'','','','','']; r.sub=true; rows.push(r); cs.lines.forEach(l=>rows.push([++n,l.code||'',l.name||'',num(l.qty),l.unit||'',num(l.wdQty),jaRemain(l)])); }); }
-  return {name:'มอบหมายงาน '+(a.no||''),title:'ใบมอบหมายงาน '+(a.no||'')+' '+(a.title||''),meta:[['ลูกค้า',a.customer||''],['วันเริ่ม',a.start||''],['วันจบ',a.end||''],['สถานะ',a.status==='done'?'จบงาน':'กำลังดำเนินการ'],...(a.detail?[['รายละเอียด',a.detail]]:[]),...((a.assignees||[]).length?[['ผู้รับมอบหมาย',a.assignees.map(x=>x.name).join(', ')]]:[]),...(a.note&&pOn('ja','note')?[['หมายเหตุ',a.note]]:[])],head:['#','รหัสสินค้า','รายการ / งาน','จำนวน','หน่วย','เบิกแล้ว','คงเหลือเบิก / สถานะ'],rows}; }
+  return {name:'มอบหมายงาน '+(a.no||''),title:'ใบมอบหมายงาน '+(a.no||'')+' '+(a.title||''),meta:[['ลูกค้า',a.customer||''],['วันเริ่ม',a.start||''],['วันจบ',a.end||''],['สถานะ',a.status==='done'?'จบงาน':'กำลังดำเนินการ'],...(a.detail?[['รายละเอียด',a.detail]]:[]),...((a.assignees||[]).length?[['ผู้รับมอบหมาย',a.assignees.map(x=>x.name).join(', ')]]:[]),...(a.note&&pOn('ja','note')?[['Remark งานที่ได้รับมอบหมาย',a.note]]:[])],head:['#','รหัสสินค้า','รายการ / งาน','จำนวน','หน่วย','เบิกแล้ว','คงเหลือเบิก / สถานะ'],rows}; }
 function tJaList(){ return {name:'มอบหมายงาน '+nowStamp(),title:'รายการมอบหมายงาน',head:['เลขที่','งาน','ลูกค้า','เริ่ม','จบ','สถานะ','รายการ','เบิกครบ'],rows:[...S.ja].sort((x,y)=>(y.no||'').localeCompare(x.no||'')).map(a=>[a.no||'',a.title||'',a.customer||'',a.start||'',a.end||'',a.status==='done'?'จบงาน':'กำลังดำเนินการ',(a.lines||[]).length,jaFull(a)?'ครบ':'ยัง'])}; }
 function vJa(){
   const el=h('div',null,h('h1',null,'มอบหมายงาน'),h('p',{class:'sub'},'หัวหน้าระบุงานที่ต้องทำและรายการวัสดุ (ดึงจาก BOM ได้) → ช่างกด "เบิกของ" เพื่อสร้างใบเบิก (บันทึกชื่อผู้ที่ login) → จบงานแล้วย้ายไปแท็บ "แล้วเสร็จ"'));
@@ -2299,7 +2299,7 @@ function jaModal(src){
     ed?h('div',{class:'bar',style:'margin-top:8px'},h('div',{style:'min-width:260px'},itemPicker(it=>{ const f=d.lines.find(l=>l.itemId===it.id); if(f) f.qty=num(f.qty)+1; else d.lines.push({k:uid(),itemId:it.id,code:it.code||'',name:it.name,unit:it.unit||'',qty:1,cost:it.cost,wdQty:0}); draw(); },undefined,true)),
       h('button',{class:'btn',onclick:async()=>{ const nm=await askName('ชื่อรายการที่ไม่อยู่ในฐานข้อมูล'); if(nm){ d.lines.push({k:uid(),itemId:'',free:true,code:'',name:nm,unit:'',qty:1,cost:0,wdQty:0}); draw(); } }},'+ รายการนอกฐานข้อมูล')):null):null,
     (d.wds||[]).length&&pOn('ja','hist')?h('div',{style:'margin-top:12px'},h('h2',null,'ประวัติการเบิก'),...(d.wds||[]).map(w=>h('div',{class:'hint'},thDate(w.date)+' · '+w.no+' · เบิกโดย '+(w.by||'-')))):null,
-    pOn('ja','note')?h('div',{class:'field',style:'margin-top:10px'},h('label',{for:'ja_note'},'หมายเหตุ'),h('textarea',{id:'ja_note',disabled:!ed,oninput:e=>d.note=e.target.value},d.note||'')):null);
+    pOn('ja','note')?h('div',{class:'field',style:'margin-top:10px'},h('label',{for:'ja_note'},'Remark งานที่ได้รับมอบหมาย'),h('textarea',{id:'ja_note',disabled:!ed,oninput:e=>d.note=e.target.value},d.note||'')):null);
   const clean=()=>{ const r=strip(d); r.lines=d.lines.map(l=>({...l,qty:num(l.qty)})); d.tasks.forEach(t=>{ if(t.who&&!d.assignees.some(x=>x.id===t.who.id)) d.assignees.push({id:t.who.id,name:t.who.name,at:new Date().toISOString()}); }); r.detail=(d.detail||'').trim(); if(isNew){ r.createdById=(CU&&CU.id)||undefined; r.createdBy=(CU&&(CU.name||CU.username))||''; } r.files=d.files.map(f=>{ const o={id:f.id,kind:f.kind,name:f.name,size:f.size||0,date:f.date}; if(f.path) o.path=f.path; if(f.bucket) o.bucket=f.bucket; return o; }); r.assignees=d.assignees.map(x=>({id:x.id,name:x.name,at:x.at})); r.tasks=d.tasks.filter(t=>(t.text||'').trim()).map(t=>({k:t.k||uid(),text:t.text.trim(),done:!!t.done,who:t.who||null})); if(r.status==='done'&&src.status!=='done'){ r.doneAt=new Date().toISOString(); r.doneBy=(CU&&(CU.name||CU.username))||''; } if(r.status!=='done'){ delete r.doneAt; delete r.doneBy; } return r; };
   const foot=[h('button',{class:'btn',onclick:closeModal},'ปิด'),];
   if(!isNew) foot.unshift(h('button',{class:'btn',onclick:()=>{ closeModal(); jaPrint(d); }},'พิมพ์/ส่งออก'));
@@ -2771,7 +2771,7 @@ function jaNotesCard(d){
   const T=d.tasks||[]; prog.textContent=T.length?'ความคืบหน้างาน: '+T.filter(t=>t.done).length+' / '+T.length+' งาน':'';
   const photo=async(path,img)=>{ try{ const {data}=await SB.storage.from('ja-files').createSignedUrl(path,3600); if(data&&data.signedUrl) img.src=data.signedUrl; }catch(e){} };
   function draw(){ const ns=[...(d.notes||[])].sort((a,b)=>(b.ts||0)-(a.ts||0));
-    box.replaceChildren(...(ns.length?ns.map(n=>h('div',{style:'border-top:1px solid var(--line);padding:8px 0'},h('div',{class:'hint'},logTs(n.ts)+' · '+(n.by||'')),n.text?h('div',{style:'white-space:pre-wrap'},n.text):null,
+    box.replaceChildren(...(ns.length?ns.map(n=>h('div',{style:'border-top:1px solid var(--line);padding:8px 0'},h('div',{class:'hint'},logTs(n.ts)+' · '+(n.by||'')+(n.via==='line'?' · ส่งผ่าน LINE':'')),n.text?h('div',{style:'white-space:pre-wrap'},n.text):null,
       (n.files||[]).length?h('div',{style:'display:flex;gap:6px;flex-wrap:wrap;margin-top:4px'},...(n.files||[]).map(p=>{ const im=h('img',{alt:'รูปหน้างาน',style:'height:90px;border-radius:6px;cursor:zoom-in;background:var(--bg);min-width:60px',onclick:()=>{ if(im.src) window.open(im.src,'_blank'); }}); photo(p,im); return im; })):null)):[h('div',{class:'hint'},'ยังไม่มีบันทึก')])); }
   const ta=h('textarea',{placeholder:'บันทึกความคืบหน้า / ปัญหาหน้างาน',style:'min-height:56px','aria-label':'บันทึกความคืบหน้า'}); const fi=h('input',{type:'file',accept:'image/*',multiple:true,'aria-label':'แนบรูป'});
   const btn=h('button',{class:'btn primary',onclick:async()=>{
@@ -2785,7 +2785,7 @@ function jaNotesCard(d){
     btn.disabled=false; btn.textContent='เพิ่มบันทึก';
   }},'เพิ่มบันทึก');
   draw();
-  return h('div',{class:'card',style:'margin-top:12px'},h('b',null,'ความคืบหน้า / รูปหน้างาน'),prog,ta,h('div',{class:'bar',style:'margin-top:6px'},fi,btn),box);
+  return h('div',{class:'card',style:'margin-top:12px'},h('b',null,'Remark ส่งงาน / ความคืบหน้า / รูปหน้างาน'),h('div',{class:'hint'},'บันทึกที่ผู้รับงานส่งมา (รวมที่ส่งผ่าน LINE) — แยกจาก Remark งานที่ได้รับมอบหมายด้านบน'),prog,ta,h('div',{class:'bar',style:'margin-top:6px'},fi,btn),box);
 }
 
 /* ---------- Backup restore ---------- */
