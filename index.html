@@ -1515,7 +1515,7 @@ function bomToJa(d){
     if(it){ const g=got.get(it.id)||{k:uid(),itemId:it.id,code:it.code||'',name:it.name,unit:it.unit||'',qty:0,cost:it.cost,wdQty:0}; g.qty=+(g.qty+q).toFixed(4); got.set(it.id,g); }
     else { const nm=[l.part,l.name,l.size].filter(Boolean).join(' · ')||l.code||'-'; const k=(l.code||nm).toLowerCase(); const g=free.get(k)||{k:uid(),itemId:'',free:true,code:l.code||'',name:nm,unit:'',qty:0,cost:(c.lines[ix]&&c.lines[ix].p)||0,wdQty:0}; g.qty=+(g.qty+q).toFixed(4); free.set(k,g); }
   });
-  const a=jaBlank(); a.title=d.title||''; a.customer=d.customer||''; a.note='สร้างจาก BOM: '+(d.title||'')+(units>1?' (x'+units+' เครื่อง)':''); a.bomId=d.id; a.lines=[...got.values(),...free.values()];
+  const a=jaBlank(); a.title=d.title||''; a.customer=d.customer||''; a.note='สร้างจาก BOM: '+(d.title||'')+(units>1?' (x'+units+' เครื่อง)':''); a.bomId=d.id; a.lines=[...got.values(),...free.values()]; a.files=(d.files||[]).filter(f=>f.path).map(f=>({id:uid(),kind:f.kind,name:f.name,size:f.size||0,date:today(),path:f.path,bucket:'drawings'}));
   if(!a.lines.length){ toast('BOM นี้ไม่มีรายการที่มีจำนวน'); return; }
   closeModal(); view='ja'; render(); jaModal(a);
   if(free.size) toast('มี '+free.size+' รายการที่ไม่อยู่ในฐานข้อมูลวัสดุ (ใส่เป็นรายการนอกฐานข้อมูล)');
@@ -2242,7 +2242,7 @@ setInterval(()=>{ if(view==='monitor'&&ready&&!document.querySelector('#layer .m
 function jaBlank(){ return {id:uid(),_new:true,tasks:[],assignees:[],no:nextNo(S.settings.jPrefix||'JA',S.ja),title:'',customer:'',start:today(),end:'',status:'open',note:'',lines:[],wds:[]}; }
 function jaModal(src){
   const d=JSON.parse(JSON.stringify(src)); const isNew=!!d._new; delete d._new;
-  d.tasks=d.tasks||[]; d.assignees=d.assignees||[]; if(!isNew){ jaMarkSeen(src); updateRail(); } const ed=canEdit('ja'); const tb=h('tbody'); const tk=h('div');
+  d.tasks=d.tasks||[]; d.assignees=d.assignees||[]; d.files=(d.files||[]).map(f=>({...f})); const removedJf=[]; if(!isNew){ jaMarkSeen(src); updateRail(); } const ed=canEdit('ja'); const tb=h('tbody'); const tk=h('div');
   const canTick=ed||canEdit('withdrawals');
   const asg=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px'});
   function drawAsg(){
@@ -2261,6 +2261,21 @@ function jaModal(src){
       ...(!d.tasks.length?[h('div',{class:'hint'},ed?'ยังไม่มีงาน — กด "+ เพิ่มงานที่ต้องทำ"':'ไม่มีรายการงาน')]:[]));
   }
   drawTasks();
+  const jfBox=h('div',{class:'card',style:'margin-top:12px'});
+  const jfOpen=async f=>{ try{ if(f._file){ const u=URL.createObjectURL(f._file); const a=h('a',{href:u,target:'_blank',download:f.name}); document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),30000); return; } if(typeof SB==='undefined'||!SB) throw new Error('ใช้ได้เฉพาะเวอร์ชันออนไลน์'); const {data,error}=await SB.storage.from(f.bucket||'ja-files').createSignedUrl(f.path,600); if(error) throw error; const w=window.open(data.signedUrl,'_blank'); if(!w) location.href=data.signedUrl; }catch(e){ toast('เปิดไฟล์ไม่ได้: '+(e&&e.message||e)); } };
+  function drawJf(){
+    const part=k=>{ const list=d.files.filter(f=>f.kind===k);
+      const pick=h('input',{type:'file',accept:'.pdf,application/pdf',multiple:true,style:'display:none',onchange:e=>{ [...e.target.files].forEach(f=>{ if(!/\.pdf$/i.test(f.name)){ toast('แนบได้เฉพาะไฟล์ PDF'); return; } if(f.size>50*1048576){ toast(f.name+' ใหญ่เกิน 50 MB'); return; } d.files.push({id:uid(),kind:k,name:f.name,size:f.size,date:today(),_file:f}); }); drawJf(); }});
+      return h('div',{class:'field',style:'min-width:240px'},
+        h('div',{style:'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px'},h('b',null,FKIND[k]),ed?h('button',{class:'btn small',onclick:()=>pick.click()},'+ แนบ PDF'):null,pick),
+        list.length?h('div',{style:'display:grid;gap:6px'},...list.map(f=>h('div',{style:'display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:8px;padding:6px 10px'},
+          h('div',{style:'min-width:0'},h('div',{style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},'📄 '+f.name),h('div',{class:'hint'},fsize(f.size||0)+(f._file?' · ยังไม่บันทึก':''))),
+          h('div',{style:'white-space:nowrap'},h('button',{class:'btn small',onclick:()=>jfOpen(f)},'เปิด'),ed?[' ',h('button',{class:'btn small danger',onclick:()=>{ const i=d.files.indexOf(f); if(i>=0) d.files.splice(i,1); if(!f._file&&f.path) removedJf.push(f); drawJf(); }},'ลบ')]:null))))
+          :h('div',{class:'hint'},'ยังไม่มีไฟล์'));
+    };
+    jfBox.replaceChildren(h('b',null,'แบบแนบ (PDF) — ส่งให้ผู้รับงานเปิดดูทาง LINE ได้'),h('div',{class:'grid g2',style:'margin-top:8px'},part('elec'),part('mech')));
+  }
+  drawJf();
   const mk=(k,l,type='text')=>h('div',{class:'field'},h('label',{for:'ja_'+k},l),h('input',{type,value:d[k]||'',id:'ja_'+k,disabled:!ed,oninput:e=>d[k]=e.target.value}));
   function draw(){
     const rows=d.lines.map(l=>h('tr',null,h('td',{class:'mono',style:'white-space:nowrap'},l.code||(l.itemId?'':'(นอกฐานข้อมูล)')),h('td',null,l.name,l.itemId?null:h('span',{class:'pill mute',style:'margin-left:6px'},'นอกฐานข้อมูล'),catOf(l)?h('div',{class:'hint'},catLabel(catOf(l))):null),
@@ -2277,6 +2292,7 @@ function jaModal(src){
     h('div',{class:'grid g4'},mk('start','วันเริ่มโครงการ','date'),mk('end','วันจบโครงการ','date')),
     h('div',{class:'field',style:'margin-top:6px'},h('label',null,'ผู้รับมอบหมายงาน (ระบบแจ้งเตือนให้ผู้ที่ถูกเลือก)'),asg),
     h('div',{class:'field',style:'margin-top:10px'},h('label',{for:'ja_detail'},'รายละเอียดงาน / สิ่งที่ต้องทำ'),h('textarea',{id:'ja_detail',rows:4,disabled:!ed,placeholder:ed?'อธิบายรายละเอียดงานให้ผู้รับมอบหมายอ่าน':'',oninput:e=>d.detail=e.target.value},d.detail||'')),
+    (ed||d.files.length)?jfBox:null,
     pOn('ja','tasks')?h('div',null,h('h2',{style:'margin-top:16px'},'งานที่ต้องทำ — ระบุคนรับผิดชอบแต่ละข้อ'),tk,ed?h('button',{class:'btn small',onclick:()=>{ d.tasks.push({k:uid(),text:'',done:false}); drawTasks(); }},'+ เพิ่มงานที่ต้องทำ'):null):null,
     pOn('ja','mats')?h('div',null,h('h2',{style:'margin-top:16px'},'รายการวัสดุที่ต้องเบิก'),
     h('div',{class:'tablewrap'},h('table',null,h('thead',null,h('tr',null,h('th',null,'รหัสสินค้า'),h('th',null,'รายการ'),h('th',{class:'num'},'คงเหลือสต็อก'),h('th',null,'จำนวน'),h('th',{class:'num'},'เบิกแล้ว'),h('th',null,''))),tb)),
@@ -2284,7 +2300,7 @@ function jaModal(src){
       h('button',{class:'btn',onclick:async()=>{ const nm=await askName('ชื่อรายการที่ไม่อยู่ในฐานข้อมูล'); if(nm){ d.lines.push({k:uid(),itemId:'',free:true,code:'',name:nm,unit:'',qty:1,cost:0,wdQty:0}); draw(); } }},'+ รายการนอกฐานข้อมูล')):null):null,
     (d.wds||[]).length&&pOn('ja','hist')?h('div',{style:'margin-top:12px'},h('h2',null,'ประวัติการเบิก'),...(d.wds||[]).map(w=>h('div',{class:'hint'},thDate(w.date)+' · '+w.no+' · เบิกโดย '+(w.by||'-')))):null,
     pOn('ja','note')?h('div',{class:'field',style:'margin-top:10px'},h('label',{for:'ja_note'},'หมายเหตุ'),h('textarea',{id:'ja_note',disabled:!ed,oninput:e=>d.note=e.target.value},d.note||'')):null);
-  const clean=()=>{ const r=strip(d); r.lines=d.lines.map(l=>({...l,qty:num(l.qty)})); d.tasks.forEach(t=>{ if(t.who&&!d.assignees.some(x=>x.id===t.who.id)) d.assignees.push({id:t.who.id,name:t.who.name,at:new Date().toISOString()}); }); r.detail=(d.detail||'').trim(); if(isNew){ r.createdById=(CU&&CU.id)||undefined; r.createdBy=(CU&&(CU.name||CU.username))||''; } r.assignees=d.assignees.map(x=>({id:x.id,name:x.name,at:x.at})); r.tasks=d.tasks.filter(t=>(t.text||'').trim()).map(t=>({k:t.k||uid(),text:t.text.trim(),done:!!t.done,who:t.who||null})); if(r.status==='done'&&src.status!=='done'){ r.doneAt=new Date().toISOString(); r.doneBy=(CU&&(CU.name||CU.username))||''; } if(r.status!=='done'){ delete r.doneAt; delete r.doneBy; } return r; };
+  const clean=()=>{ const r=strip(d); r.lines=d.lines.map(l=>({...l,qty:num(l.qty)})); d.tasks.forEach(t=>{ if(t.who&&!d.assignees.some(x=>x.id===t.who.id)) d.assignees.push({id:t.who.id,name:t.who.name,at:new Date().toISOString()}); }); r.detail=(d.detail||'').trim(); if(isNew){ r.createdById=(CU&&CU.id)||undefined; r.createdBy=(CU&&(CU.name||CU.username))||''; } r.files=d.files.map(f=>{ const o={id:f.id,kind:f.kind,name:f.name,size:f.size||0,date:f.date}; if(f.path) o.path=f.path; if(f.bucket) o.bucket=f.bucket; return o; }); r.assignees=d.assignees.map(x=>({id:x.id,name:x.name,at:x.at})); r.tasks=d.tasks.filter(t=>(t.text||'').trim()).map(t=>({k:t.k||uid(),text:t.text.trim(),done:!!t.done,who:t.who||null})); if(r.status==='done'&&src.status!=='done'){ r.doneAt=new Date().toISOString(); r.doneBy=(CU&&(CU.name||CU.username))||''; } if(r.status!=='done'){ delete r.doneAt; delete r.doneBy; } return r; };
   const foot=[h('button',{class:'btn',onclick:closeModal},'ปิด'),];
   if(!isNew) foot.unshift(h('button',{class:'btn',onclick:()=>{ closeModal(); jaPrint(d); }},'พิมพ์/ส่งออก'));
   if(ed&&!isNew) foot.unshift(h('button',{class:'btn danger',onclick:async()=>{ if(!await ask('ลบ JA นี้?')) return; if(await del('ja',d.id)) closeModal(); }},'ลบ'));
@@ -2294,9 +2310,14 @@ function jaModal(src){
     if(d.start&&d.end&&d.end<d.start){ toast('วันจบต้องไม่ก่อนวันเริ่ม'); return; }
     if(!d.lines.length&&!(d.detail||'').trim()&&!d.tasks.some(t=>(t.text||'').trim())&&d.status!=='done'){ toast('ระบุงานที่ต้องทำหรือรายการวัสดุอย่างน้อย 1 รายการ'); return; }
     if(isNew) d.no=await freshNo(S.settings.jPrefix||'JA',S.ja,d.no);
+    if(d.files.length&&(typeof SB==='undefined'||!SB)&&d.files.some(f=>f._file)){ toast('แนบแบบได้เฉพาะเวอร์ชันออนไลน์'); return; }
+    try{ for(const f of d.files){
+      if(f._file){ const p='ja/'+d.id+'/d/'+f.id+'.pdf'; const {error}=await SB.storage.from('ja-files').upload(p,f._file,{contentType:'application/pdf',upsert:true}); if(error) throw error; f.path=p; f.bucket='ja-files'; delete f._file; }
+      else if(f.path&&f.bucket==='drawings'){ const p='ja/'+d.id+'/d/'+f.id+'.pdf'; const {error}=await SB.storage.from('drawings').copy(f.path,p,{destinationBucket:'ja-files'}); if(!error){ f.path=p; f.bucket='ja-files'; } }
+    } }catch(e){ toast('อัปโหลดแบบไม่สำเร็จ: '+(e&&e.message||e)); return; }
     const cl0=clean(); const newIds=(d.assignees||[]).filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id);
-    const chg=[]; if(!isNew){ const J=x=>JSON.stringify(x||''); if((src.title||'')!==(cl0.title||'')) chg.push('ชื่องาน'); if((src.customer||'')!==(cl0.customer||'')) chg.push('ลูกค้า'); if((src.detail||'')!==(cl0.detail||'')) chg.push('รายละเอียด'); if((src.start||'')!==(cl0.start||'')||(src.end||'')!==(cl0.end||'')) chg.push('กำหนดเวลา'); if(J((src.lines||[]).map(l=>[l.id||l.name,l.qty]))!==J((cl0.lines||[]).map(l=>[l.id||l.name,l.qty]))) chg.push('รายการวัสดุ'); if(J((src.tasks||[]).map(t=>[t.text,t.who&&t.who.id]))!==J((cl0.tasks||[]).map(t=>[t.text,t.who&&t.who.id]))) chg.push('งานที่ต้องทำ'); }
-    if(await put('ja',d.id,cl0)){ if(chg.length) linePush('✏️ แก้ไขงาน '+d.no+' '+(d.title||'')+' ('+chg.join(', ')+') โดย '+logBy(),false,[cl0.createdById||src.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&!newIds.includes(x)&&(!CU||x!==CU.id)),{head:'✏️ แก้ไขงาน',color:'#b7791f',title:d.no+' '+(d.title||''),lines:['แก้ไข: '+chg.join(', '),'โดย '+logBy()].concat(jaBrief(cl0)),go:'monitor',jaId:d.id}); if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id),{head:'📋 มอบหมายงานใหม่',title:d.no+' '+(d.title||''),lines:jaBrief(cl0).concat(['โดย '+logBy()]),go:'monitor',jaId:d.id}); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
+    const chg=[]; if(!isNew){ const J=x=>JSON.stringify(x||''); if((src.title||'')!==(cl0.title||'')) chg.push('ชื่องาน'); if((src.customer||'')!==(cl0.customer||'')) chg.push('ลูกค้า'); if((src.detail||'')!==(cl0.detail||'')) chg.push('รายละเอียด'); if((src.start||'')!==(cl0.start||'')||(src.end||'')!==(cl0.end||'')) chg.push('กำหนดเวลา'); if(J((src.lines||[]).map(l=>[l.id||l.name,l.qty]))!==J((cl0.lines||[]).map(l=>[l.id||l.name,l.qty]))) chg.push('รายการวัสดุ'); if(J((src.tasks||[]).map(t=>[t.text,t.who&&t.who.id]))!==J((cl0.tasks||[]).map(t=>[t.text,t.who&&t.who.id]))) chg.push('งานที่ต้องทำ'); if((src.files||[]).length!==(cl0.files||[]).length) chg.push('แบบแนบ'); }
+    if(await put('ja',d.id,cl0)){ try{ for(const m of removedJf) if((m.bucket||'ja-files')==='ja-files') await SB.storage.from('ja-files').remove([m.path]); }catch(e){} if(chg.length) linePush('✏️ แก้ไขงาน '+d.no+' '+(d.title||'')+' ('+chg.join(', ')+') โดย '+logBy(),false,[cl0.createdById||src.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&!newIds.includes(x)&&(!CU||x!==CU.id)),{head:'✏️ แก้ไขงาน',color:'#b7791f',title:d.no+' '+(d.title||''),lines:['แก้ไข: '+chg.join(', '),'โดย '+logBy()].concat(jaBrief(cl0)),go:'monitor',jaId:d.id}); if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id),{head:'📋 มอบหมายงานใหม่',title:d.no+' '+(d.title||''),lines:jaBrief(cl0).concat(['โดย '+logBy()]),go:'monitor',jaId:d.id}); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
   }},'บันทึก'));
   if(!isNew&&typeof SB!=='undefined'&&SB) body.append(jaNotesCard(d));
   openModal((isNew?'มอบหมายงานใหม่':'มอบหมายงาน '+d.no),body,foot);
@@ -2309,8 +2330,12 @@ function vWithdrawals(){
   const list=[...vwd()].sort((a,b)=>(b.no||'').localeCompare(a.no||''));
   if(!list.length){ el.append(h('div',{class:'tablewrap'},h('div',{class:'empty'},'ยังไม่มีใบเบิกของ'))); return el; }
   el.append(h('div',{class:'tablewrap'},h('table',null,h('tr',null,h('th',null,'เลขที่'),h('th',null,'วันที่'),h('th',null,'งาน / เครื่อง'),h('th',null,'ผู้เบิก'),h('th',{class:'num'},'รายการ'),h('th',null,'ไม่มีในสต็อก'),h('th',null,'')),
-    list.map(w=>h('tr',null,h('td',{class:'mono'},w.no),h('td',null,thDate(w.date)),h('td',null,w.job||'-'),h('td',null,w.requester||'-'),h('td',{class:'num'},(w.lines||[]).length),h('td',null,(w.lines||[]).some(l=>l.nostock)?h('span',{class:'pill bad'},(w.lines||[]).filter(l=>l.nostock).length+' รายการ'):''),h('td',null,h('button',{class:'btn small',onclick:()=>withdrawView(w)},'ดู')))))));
+    list.map(w=>h('tr',null,h('td',{class:'mono'},w.no),h('td',null,thDate(w.date)),h('td',null,w.job||'-'),h('td',null,w.requester||'-'),h('td',{class:'num'},(w.lines||[]).length),h('td',null,(w.lines||[]).some(l=>l.nostock)?h('span',{class:'pill bad'},(w.lines||[]).filter(l=>l.nostock).length+' รายการ'):''),h('td',null,w.status==='requested'?h('span',{class:'pill warn',style:'margin-right:6px'},'รอยืนยัน (จาก LINE)'):null,w.status==='requested'&&canEdit('withdrawals')?h('button',{class:'btn small primary',style:'margin-right:6px',onclick:()=>withdrawConfirm(w)},'ยืนยันเบิก'):null,h('button',{class:'btn small',onclick:()=>withdrawView(w)},'ดู')))))));
   return el;
+}
+function withdrawConfirm(w){
+  const ls=(w.lines||[]).map(l=>{ const it=l.itemId&&S.items.find(i=>i.id===l.itemId); return {jk:l.jk,itemId:it?it.id:'',free:it?undefined:true,code:l.code||'',name:l.name,unit:l.unit||'',qty:l.qty,cost:it?it.cost:num(l.cost)}; });
+  withdrawModal({reqId:w.id,no:w.no,date:w.date,job:w.job,note:w.note,jaId:w.jaId,jaNo:w.jaNo,lines:ls,freeCount:ls.filter(l=>l.free).length,requester:w.requester,requesterBy:w.by,requesterById:w.byId});
 }
 function withdrawView(w){
   const L=w.lines||[], ok=L.filter(l=>!l.nostock), no=L.filter(l=>l.nostock);
@@ -2335,7 +2360,7 @@ function withdrawView(w){
 }
 function withdrawModal(init){
   init=init||{};
-  const d={no:nextNo(S.settings.wPrefix,S.withdrawals),date:today(),job:init.job||'',requester:(CU&&(CU.name||CU.username))||'',note:init.note||'',jaId:init.jaId||'',jaNo:init.jaNo||'',lines:(init.lines||[]).map(l=>({...l}))};
+  const d={no:init.no||nextNo(S.settings.wPrefix,S.withdrawals),date:init.date||today(),job:init.job||'',requester:init.requester||(CU&&(CU.name||CU.username))||'',note:init.note||'',jaId:init.jaId||'',jaNo:init.jaNo||'',lines:(init.lines||[]).map(l=>({...l}))};
   const tb=h('tbody'), total=h('div',{class:'mono',style:'text-align:right;margin-top:8px'}), err=h('div',{class:'warnline'});
   const mk=(k,l,type='text')=>h('div',{class:'field'},h('label',{for:'w_'+k},l),h('input',{type,value:d[k],id:'w_'+k,oninput:e=>d[k]=e.target.value}));
   function check(){
@@ -2377,10 +2402,10 @@ function withdrawModal(init){
       if(!d.lines.length){toast('เลือกวัสดุก่อน');return;}
       if(d.lines.some(l=>num(l.qty)<=0)){toast('จำนวนเบิกต้องมากกว่า 0');return;}
       const btn=ev.currentTarget; btn.disabled=true;
-      d.no=await freshNo(S.settings.wPrefix,S.withdrawals,d.no);
-      const rec={no:d.no,date:d.date,job:d.job,requester:(CU&&(CU.name||CU.username))||d.requester,by:(CU&&CU.username)||'',byId:(CU&&CU.id)||undefined,jaId:d.jaId||undefined,jaNo:d.jaNo||undefined,note:d.note,lines:d.lines.map(l=>{ const have=stockOf(l.itemId); const ns=!!l.free||num(l.qty)>have;
+      if(!init.reqId) d.no=await freshNo(S.settings.wPrefix,S.withdrawals,d.no);
+      const rec={no:d.no,date:d.date,job:d.job,requester:init.reqId?d.requester:((CU&&(CU.name||CU.username))||d.requester),by:init.reqId?(init.requesterBy||''):((CU&&CU.username)||''),byId:init.reqId?(init.requesterById||undefined):((CU&&CU.id)||undefined),confirmedBy:init.reqId?((CU&&(CU.name||CU.username))||''):undefined,jaId:d.jaId||undefined,jaNo:d.jaNo||undefined,note:d.note,lines:d.lines.map(l=>{ const have=stockOf(l.itemId); const ns=!!l.free||num(l.qty)>have;
         return {jk:l.jk,cat:catOf(l)||undefined,itemId:l.itemId,free:l.free?1:undefined,nostock:ns?1:undefined,remark:ns?(l.free?'ไม่มีในสต็อก (ไม่อยู่ในฐานข้อมูล)':(have>0?'ไม่มีในสต็อก (คงเหลือ '+n0(have)+')':'ไม่มีในสต็อก')):undefined,code:l.code||'',name:l.name,unit:l.unit,qty:num(l.qty),cost:l.cost,wh:(ns?undefined:(l.wh||undefined))}; })};
-      const wid=uid();
+      const wid=init.reqId||uid();
       if(!(await put('withdrawals',wid,rec))){ btn.disabled=false; return; }
       for(const l of rec.lines){
         const it=S.items.find(i=>i.id===l.itemId);
