@@ -1161,6 +1161,7 @@ td.n{text-align:right;white-space:nowrap}thead{display:table-header-group}tr{pag
 <div class="pd">พิมพ์เมื่อ ${thDate(today())}</div></body></html>`;
 }
 async function pdfSave(html,name,landscape){
+  if(window.flutter_inappwebview&&window.flutter_inappwebview.callHandler){ try{ await window.flutter_inappwebview.callHandler('printHtml',html,name,!!landscape); }catch(e){ toast('สั่งพิมพ์ไม่สำเร็จ'); } return; }
   if(window.native&&window.native.savePdf){
     try{ const r=await window.native.savePdf(html,name+'.pdf',!!landscape); if(r&&r.ok) toast('บันทึก PDF แล้ว'); else if(r&&!r.canceled) toast('บันทึก PDF ไม่สำเร็จ'); }catch(e){ toast('บันทึก PDF ไม่สำเร็จ'); }
     return;
@@ -1221,6 +1222,7 @@ async function saveFile(filename,data){
   try{
     const mt={html:'text/html;charset=utf-8',csv:'text/csv;charset=utf-8',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',pdf:'application/pdf'}[(filename.split('.').pop()||'').toLowerCase()]||'text/plain;charset=utf-8';
     const blob=new Blob([data],{type:mt});
+    if(window.flutter_inappwebview&&window.flutter_inappwebview.callHandler){ const b64=await new Promise((ok,no)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]||''); r.onerror=no; r.readAsDataURL(blob); }); await window.flutter_inappwebview.callHandler('saveFile',filename,b64,mt); return; }
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.append(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   }catch(e){ toast('บันทึกไฟล์ไม่สำเร็จ'); }
