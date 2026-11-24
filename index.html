@@ -872,7 +872,7 @@ function vItems(){
     canEdit('items')?h('button',{class:'btn primary',onclick:()=>itemModal()},'เพิ่มวัสดุ'):null,
     canEdit('items')?h('button',{class:'btn',onclick:importModal},'นำเข้าจากตาราง'):null,
     h('button',{class:'btn',onclick:()=>scanItem(it=>itemModal(it))},'📷 สแกน'),
-    h('button',{class:'btn',title:'พิมพ์ป้าย QR ตามรายการที่กรองอยู่ (สูงสุด 120)',onclick:()=>labelPrint(_itemList||[])},'พิมพ์ป้าย QR'),
+    h('button',{class:'btn',title:'พิมพ์ป้าย QR ตามรายการที่กรองอยู่ (ทุกรายการ แบ่งหน้า A4 อัตโนมัติ)',onclick:()=>labelPrint(_itemList||[])},'พิมพ์ป้าย QR'),
     isAdmin()&&S.items.some(i=>i.stockWh)?h('button',{class:'btn',onclick:whModal},'ตั้งชื่อคลัง'):null,
     (()=>{ const pl=canEdit('items')?autoCatPlan():null; return pl&&pl.hit?h('button',{class:'btn primary',title:'จัดหมวดจากชื่อสินค้า เช่น ไฟฟ้า / เครื่องกล / ค่าแรง',onclick:autoCatApply},`จัดหมวดหมู่อัตโนมัติ (${n0(pl.hit)})`):null; })(),
     (()=>{ const pl=canEdit('items')?stockImpPlan():null; return pl&&(pl.upd||pl.add)?h('button',{class:'btn primary',title:pl.R.src,onclick:stockImport},`นำเข้าสต๊อกจากรายงานบริษัท (${n0(pl.upd+pl.add)})`):null; })(),
@@ -2703,9 +2703,8 @@ async function labelPrint(items){
   if(!items.length){ toast('ไม่มีรายการ'); return; }
   try{ await loadJs('vendor/qrcode.js'); }catch(e){ toast('โหลดตัวสร้าง QR ไม่ได้'); return; }
   const svg=t=>{ const q=qrcode(0,'M'); q.addData(String(t)); q.make(); return q.createSvgTag(4,0); };
-  const cells=items.slice(0,120).map(i=>`<div class="lb"><div class="q">${svg(i.code||i.id)}</div><div class="t"><b>${esc(i.code||'')}</b><br>${esc(i.name||'')}</div></div>`).join('');
+  const cells=items.map(i=>`<div class="lb"><div class="q">${svg(i.code||i.id)}</div><div class="t"><b>${esc(i.code||'')}</b><br>${esc(i.name||'')}</div></div>`).join('');
   pdfSave(`<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>ป้าย QR</title><style>body{margin:0;font:11px/1.3 Tahoma,'Noto Sans Thai',sans-serif}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.lb{border:1px dashed #888;padding:6px;display:flex;gap:8px;align-items:center;page-break-inside:avoid}.q{width:70px;height:70px;flex:none}.q svg{width:100%;height:100%}.t{overflow:hidden}@page{size:A4;margin:10mm}</style></head><body><div class="g">${cells}</div></body></html>`,'ป้าย QR',false);
-  if(items.length>120) toast('พิมพ์ได้ครั้งละ 120 ป้าย (พิมพ์ 120 รายการแรก)');
 }
 
 /* ---------- JA: บันทึกความคืบหน้า + รูปถ่าย ---------- */
