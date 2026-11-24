@@ -2135,7 +2135,7 @@ async function jaToggleDone(a,on){
   const r=strip(a);
   if(on){ r.status='done'; r.doneAt=new Date().toISOString(); r.doneBy=(CU&&(CU.name||CU.username))||''; }
   else { r.status='open'; delete r.doneAt; delete r.doneBy; }
-  if(await put('ja',a.id,r)){ if(on) linePush('✅ งาน '+a.no+' '+(a.title||'')+' เสร็จแล้ว โดย '+logBy(),false,[a.createdById].concat((a.assignees||[]).map(x=>x.id)).filter(x=>!CU||x!==CU.id),{head:'✅ งานเสร็จแล้ว',color:'#2e8b57',title:a.no+' '+(a.title||''),lines:['โดย '+logBy()].concat(jaBriefLines(a)),go:'monitor',jaId:a.id}); toast(on?a.no+' เสร็จแล้ว — ย้ายไปแท็บ "แล้วเสร็จ"':a.no+' เปิดงานอีกครั้ง'); } else render();
+  if(await put('ja',a.id,r)){ if(on) linePush('✅ งาน '+a.no+' '+(a.title||'')+' เสร็จแล้ว โดย '+logBy(),false,[a.createdById].concat((a.assignees||[]).map(x=>x.id),leaderIds(),CU?[CU.id]:[]).filter(Boolean),{head:'✅ งานเสร็จแล้ว',color:'#2e8b57',title:a.no+' '+(a.title||''),lines:['โดย '+logBy()].concat(jaBriefLines(a)),go:'monitor',jaId:a.id}); toast(on?a.no+' เสร็จแล้ว — ย้ายไปแท็บ "แล้วเสร็จ"':a.no+' เปิดงานอีกครั้ง'); } else render();
 }
 function jaWithdraw(a){
   if(!canEdit('withdrawals')){ toast('คุณไม่มีสิทธิ์สร้างใบเบิก'); return; }
@@ -2182,6 +2182,7 @@ async function jaTick(a,t,on){
     const tasks=(a.tasks||[]).map(x=>x.k===t.k?{...x,done:on,doneBy:on?((CU&&(CU.name||CU.username))||''):null}:x);
     if(typeof SB!=='undefined'&&SB){ const {data,error}=await SB.rpc('ja_set_task',{p_ja:a.id,p_task:t.k,p_done:on}); if(error) throw error; applyRemote('ja',a.id,data||{...strip(a),tasks}); }
     else await put('ja',a.id,{...strip(a),tasks});
+    if(on) linePush('☑️ '+logBy()+' ทำงานเสร็จ: '+t.text+' ('+a.no+')',false,[a.createdById].concat(leaderIds(),CU?[CU.id]:[]).filter(Boolean),{head:'☑️ ลูกทีมอัปเดตงาน',color:'#2e8b57',title:a.no+' '+(a.title||''),lines:['แก้ไขเมื่อ '+logTs(Date.now())+' โดย '+logBy(),'ติ๊กงานเสร็จ: '+t.text,'ความคืบหน้า: '+tasks.filter(x=>x.done).length+'/'+tasks.length+' งาน'],go:'monitor',jaId:a.id});
     toast(on?'ติ๊กงานเสร็จแล้ว':'ยกเลิกการติ๊กแล้ว'); render();
   }catch(e){ toast('บันทึกไม่สำเร็จ: '+((e&&e.message)||e)); render(); }
 }
@@ -2334,7 +2335,7 @@ function jaModal(src){
     } }catch(e){ toast('อัปโหลดแบบไม่สำเร็จ: '+(e&&e.message||e)); return; }
     const cl0=clean(); const newIds=(d.assignees||[]).filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id);
     const chg=isNew?[]:jaDiff(src,cl0);
-    if(await put('ja',d.id,cl0)){ try{ for(const m of removedJf) if((m.bucket||'ja-files')==='ja-files') await SB.storage.from('ja-files').remove([m.path]); }catch(e){} if(chg.length) linePush('✏️ แก้ไขงาน '+d.no+' '+(d.title||'')+' ('+chg.length+' รายการ) โดย '+logBy(),false,[cl0.createdById||src.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&!newIds.includes(x)&&(!CU||x!==CU.id)),{head:'✏️ แก้ไขงาน',color:'#b7791f',title:d.no+' '+(d.title||''),lines:['แก้ไขเมื่อ '+logTs(Date.now())+' โดย '+logBy(),'รายการที่แก้ไข ('+chg.length+')'].concat(chg.slice(0,20).map(x=>'• '+x),chg.length>20?['…และอีก '+(chg.length-20)+' รายการ']:[],['— รายละเอียดงานฉบับล่าสุด —'],jaBriefLines(cl0)),go:'monitor',jaId:d.id}); if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id),{head:'📋 มอบหมายงานใหม่',title:d.no+' '+(d.title||''),lines:jaBriefLines(cl0).concat(['โดย '+logBy()]),go:'monitor',jaId:d.id}); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
+    if(await put('ja',d.id,cl0)){ try{ for(const m of removedJf) if((m.bucket||'ja-files')==='ja-files') await SB.storage.from('ja-files').remove([m.path]); }catch(e){} if(chg.length) linePush('✏️ แก้ไขงาน '+d.no+' '+(d.title||'')+' ('+chg.length+' รายการ) โดย '+logBy(),false,[cl0.createdById||src.createdById].concat((d.assignees||[]).map(x=>x.id),leaderIds(),CU?[CU.id]:[]).filter(x=>x&&!newIds.includes(x)),{head:'✏️ แก้ไขงาน',color:'#b7791f',title:d.no+' '+(d.title||''),lines:['แก้ไขเมื่อ '+logTs(Date.now())+' โดย '+logBy(),'รายการที่แก้ไข ('+chg.length+')'].concat(chg.slice(0,20).map(x=>'• '+x),chg.length>20?['…และอีก '+(chg.length-20)+' รายการ']:[],['— รายละเอียดงานฉบับล่าสุด —'],jaBriefLines(cl0)),go:'monitor',jaId:d.id}); if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id),{head:'📋 มอบหมายงานใหม่',title:d.no+' '+(d.title||''),lines:jaBriefLines(cl0).concat(['โดย '+logBy()]),go:'monitor',jaId:d.id}); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
   }},'บันทึก'));
   if(!isNew&&typeof SB!=='undefined'&&SB) body.append(jaNotesCard(d));
   openModal((isNew?'มอบหมายงานใหม่':'มอบหมายงาน '+d.no),body,foot);
@@ -2461,6 +2462,7 @@ function stockMove(it,delta,wh,logText){
 const mvAdd=(type,it,qty,ref,extra)=>put('moves',uid(),{type,itemId:it?it.id:'',name:it?it.name:'',qty,by:(CU&&CU.username)||'',byId:(CU&&CU.id)||undefined,requester:(CU&&(CU.name||CU.username))||'',date:today(),ref,ts:Date.now(),...(extra||{})});
 
 /* ---------- LINE ---------- */
+const leaderIds=()=>((S.settings||{}).leaders||[]).filter(Boolean);
 async function linePush(text,force,ids,card){
   try{ if((!force&&(S.settings||{}).lineOn===false)||typeof SB==='undefined'||!SB) return null;
     ids=[...new Set((ids||[]).filter(Boolean))]; if(!ids.length) return null;
@@ -2738,6 +2740,10 @@ function opsCard(){
   const loadSnap=async()=>{ if(!online) return; const {data,error}=await SB.rpc('admin_snapshot_info'); if(error){ snapBox.textContent='โหลดไม่ได้: '+errMsg(error); return; }
     snapBox.replaceChildren(...(data&&data.length?data.slice(0,6).map(s=>h('div',null,'📸 '+logTs(s.snap_at)+' — '+n0(s.n)+' รายการ')):[h('span',null,'ยังไม่มีสแนปช็อต')]),h('div',{style:'margin-top:4px'},'ระบบถ่ายสแนปช็อตอัตโนมัติทุกสัปดาห์ (เก็บย้อนหลังบนเซิร์ฟเวอร์) — กู้คืนผ่านผู้ดูแลระบบ/แจ้งผู้พัฒนา')); };
   loadSnap();
+  const lead=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px'});
+  const drawLead=()=>{ if(!TEAM.length){ lead.replaceChildren(h('span',{class:'hint'},_teamLoaded?'ไม่พบรายชื่อผู้ใช้':'กำลังโหลดรายชื่อ…')); return; }
+    lead.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:leaderIds().includes(u.id),onchange:async e=>{ const cur=new Set(leaderIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,leaders:[...cur]})) toast('บันทึกหัวหน้าทีมแล้ว'); }}),u.name))); };
+  if(online){ drawLead(); if(!_teamLoaded||!TEAM.length) loadTeam().then(drawLead); }
   const lineRes=h('div',{class:'hint'});
   return h('div',{class:'card',style:'margin-bottom:14px'},h('b',null,'สำรองข้อมูล · Audit · แจ้งเตือน LINE (ผู้ดูแล)'),
     h('div',{class:'bar',style:'margin-top:8px'},
@@ -2747,6 +2753,7 @@ function opsCard(){
     h('div',{style:'margin-top:8px'},snapBox),
     online?h('div',{style:'margin-top:12px;border-top:1px solid var(--line);padding-top:10px'},
       h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:S.settings.lineOn!==false,onchange:async e=>{ if(await putSettings({...S.settings,lineOn:e.target.checked})) toast(e.target.checked?'เปิดแจ้งเตือน LINE':'ปิดแจ้งเตือน LINE'); }}),'แจ้งเตือน LINE รายคน เมื่อมอบหมายงานใหม่ / งานเสร็จ'),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'👑 หัวหน้าทีม'),h('div',{class:'hint'},'ได้รับแจ้งทาง LINE เมื่องานเสร็จ และเมื่อลูกทีมอัปเดต/ส่งงาน/ติ๊กงาน/ขอเบิกของ (ติ๊กได้หลายคน)'),lead),
       h('div',{class:'hint',style:'margin:4px 0'},'ผู้ใช้แต่ละคนกด "🔔 ผูก LINE" ที่เมนูเพื่อผูกบัญชีของตัวเอง · ระบบส่งหาเฉพาะผู้ที่เกี่ยวข้อง'),
       h('button',{class:'btn small',onclick:async()=>{ lineRes.textContent='กำลังส่ง…'; const r=await linePush('🔔 ทดสอบแจ้งเตือนจากระบบประมาณราคา',true,[CU.id]); lineRes.textContent=r&&r.ok?'ส่งสำเร็จ':'ยังส่งไม่ได้: '+((r&&r.error)||'ไม่ทราบสาเหตุ'); }},'ส่งข้อความทดสอบ'),h('button',{class:'btn small',style:'margin-left:6px',onclick:async()=>{ lineRes.textContent='กำลังตั้งเมนู…'; try{ const {data,error}=await SB.functions.invoke('line-setup',{body:{}}); lineRes.textContent=error?('ไม่สำเร็จ: '+error.message):(data&&data.ok?'ตั้งเมนู LINE OA สำเร็จ (อาจใช้เวลาสักครู่กว่าจะขึ้นในแชท)':'ไม่สำเร็จ: '+((data&&data.error)||'')); }catch(e){ lineRes.textContent='ไม่สำเร็จ: '+(e.message||e); } }},'ตั้ง/อัปเดตเมนู LINE OA'),lineRes,lineList):null);
 }
@@ -2797,7 +2804,7 @@ function jaNotesCard(d){
     try{
       for(const f of files.slice(0,8)){ const blob=await imgBlob(f); const path='ja/'+d.id+'/'+uid()+'.jpg'; const {error}=await SB.storage.from('ja-files').upload(path,blob,{contentType:'image/jpeg'}); if(error) throw error; paths.push(path); }
       const {data,error}=await SB.rpc('ja_add_note',{p_ja:d.id,p_note:{text,files:paths}}); if(error) throw error;
-      d.notes=(data&&data.notes)||d.notes; linePush('📝 บันทึกใหม่ในงาน '+d.no+' '+(d.title||'')+' โดย '+logBy()+(text?': '+text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),false,[d.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&(!CU||x!==CU.id)),{head:'📝 บันทึกใหม่',color:'#6b4fa0',title:d.no+' '+(d.title||''),lines:[(text?text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),'โดย '+logBy()].filter(x=>x.trim()),go:'monitor',jaId:d.id}); const a=S.ja.find(x=>x.id===d.id); if(a) a.notes=d.notes; ta.value=''; fi.value=''; draw(); toast('บันทึกแล้ว');
+      d.notes=(data&&data.notes)||d.notes; linePush('📝 บันทึกใหม่ในงาน '+d.no+' '+(d.title||'')+' โดย '+logBy()+(text?': '+text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),false,[d.createdById].concat((d.assignees||[]).map(x=>x.id),leaderIds(),CU?[CU.id]:[]).filter(Boolean),{head:'📝 บันทึกใหม่',color:'#6b4fa0',title:d.no+' '+(d.title||''),lines:[(text?text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),'โดย '+logBy()].filter(x=>x.trim()),go:'monitor',jaId:d.id}); const a=S.ja.find(x=>x.id===d.id); if(a) a.notes=d.notes; ta.value=''; fi.value=''; draw(); toast('บันทึกแล้ว');
     }catch(e){ toast('บันทึกไม่สำเร็จ: '+errMsg(e)); }
     btn.disabled=false; btn.textContent='เพิ่มบันทึก';
   }},'เพิ่มบันทึก');
