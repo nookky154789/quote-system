@@ -1292,7 +1292,8 @@ function itemPicker(onPick, label='เพิ่มจากรายการว
     if(useBelow){ list.style.top=(r.bottom+2)+'px'; list.style.bottom='auto'; } else { list.style.bottom=(window.innerHeight-r.top+2)+'px'; list.style.top='auto'; }
   }
   const onMove=e=>{ if(open&&!(e&&e.target&&list.contains(e.target))) place(); };
-  function hide(){ open=false; list.remove(); window.removeEventListener('resize',onMove); document.removeEventListener('scroll',onMove,true); if(window.visualViewport) window.visualViewport.removeEventListener('resize',onMove); }
+  const outside=e=>{ if(!list.contains(e.target)&&e.target!==inp) hide(); };
+  function hide(){ open=false; list.remove(); document.removeEventListener('pointerdown',outside,true); window.removeEventListener('resize',onMove); document.removeEventListener('scroll',onMove,true); if(window.visualViewport) window.visualViewport.removeEventListener('resize',onMove); }
   inp=h('input',{type:'search','aria-label':label,placeholder:'+ '+label+' (พิมพ์ชื่อหรือรหัส)',autocomplete:'off'});
   function pick(it){ onPick(it); inp.value=''; hide(); }
   function show(){
@@ -1308,13 +1309,17 @@ function itemPicker(onPick, label='เพิ่มจากรายการว
       const gb=[['','ทั้งหมด'],...CAT_GROUPS.map(g=>[g,(CAT_ICON[g]||'')+g])].map(([v,t])=>h('button',{type:'button',style:bs,class:'btn small'+(gf===v?' primary':''),onmousedown:e=>{ e.preventDefault(); gf=v; sc=''; show(); }},t));
       const sb=gf?CAT_LIST.filter(c=>c.startsWith(gf+' › ')).map(c=>h('button',{type:'button',style:bs,class:'btn small'+(sc===c?' primary':''),onmousedown:e=>{ e.preventDefault(); sc=(sc===c?'':c); show(); }},c.split(' › ')[1])):[];
       const row=k=>h('div',{style:nw?'display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:4px 10px;-webkit-overflow-scrolling:touch':'display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px'},...k);
-      list.prepend(h('div',{style:'position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);z-index:1'},...(nw?[row(gb),sb.length?row(sb):null]:[row([...gb,...sb])]).filter(Boolean))); }
-    if(!open){ open=true; document.body.append(list); window.addEventListener('resize',onMove); document.addEventListener('scroll',onMove,true); if(window.visualViewport) window.visualViewport.addEventListener('resize',onMove); }
+      const subs=gf?CAT_LIST.filter(c=>c.startsWith(gf+' › ')):[];
+      const sel=h('div',{style:'display:flex;gap:6px;padding:6px 8px'},
+        h('select',{'aria-label':'กลุ่มหมวด',style:'flex:1;min-width:0',onmousedown:e=>e.stopPropagation(),onchange:e=>{ gf=e.target.value; sc=''; show(); }},h('option',{value:''},'ทุกกลุ่ม'),...CAT_GROUPS.map(g=>h('option',{value:g,selected:gf===g},(CAT_ICON[g]||'')+g))),
+        h('select',{'aria-label':'หมวดย่อย',style:'flex:1;min-width:0',disabled:!gf,onchange:e=>{ sc=e.target.value; show(); }},h('option',{value:''},gf?'ทุกหมวดย่อย':'หมวดย่อย'),...subs.map(c=>h('option',{value:c,selected:sc===c},c.split(' › ')[1]))));
+      list.prepend(h('div',{style:'position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);z-index:1'},...(nw?[sel]:[row([...gb,...sb])]))); }
+    if(!open){ open=true; document.body.append(list); document.addEventListener('pointerdown',outside,true); window.addEventListener('resize',onMove); document.addEventListener('scroll',onMove,true); if(window.visualViewport) window.visualViewport.addEventListener('resize',onMove); }
     place(); list.scrollTop=0;
   }
   inp.addEventListener('input',show); inp.addEventListener('focus',()=>{ show(); if(window.innerWidth<700) setTimeout(()=>{ try{ inp.scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} setTimeout(()=>{ if(open) place(); },350); },250); }); inp.addEventListener('click',show);
   inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&cur.length&&open){ e.preventDefault(); pick(cur[0]); } if(e.key==='Escape') hide(); });
-  inp.addEventListener('blur',()=>setTimeout(hide,120));
+  inp.addEventListener('blur',()=>setTimeout(()=>{ if(document.activeElement&&list.contains(document.activeElement)) return; hide(); },150));
   box.append(inp); return box;
 }
 
