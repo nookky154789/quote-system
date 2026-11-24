@@ -1282,17 +1282,17 @@ function itemPicker(onPick, label='เพิ่มจากรายการว
   const list=h('div',{style:'position:fixed;z-index:200;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 8px 24px rgba(0,0,0,.25)'});
   let cur=[], open=false, inp=null, gf='', sc='';
   function place(){
-    const r=inp.getBoundingClientRect(), vh=window.innerHeight, vw=window.innerWidth;
+    const r=inp.getBoundingClientRect(), vv=window.visualViewport, vh=vv?vv.offsetTop+vv.height:window.innerHeight, vw=window.innerWidth;
     const below=vh-r.bottom-10, above=r.top-10;
     const useBelow=below>=260||below>=above;
     const maxH=Math.max(150,Math.min(520,useBelow?below:above));
-    const w=Math.min(Math.max(r.width,520),vw-16);
+    const w=Math.min(Math.max(r.width,vw<700?0:520),vw-16);
     const left=Math.max(8,Math.min(r.left,vw-w-8));
     list.style.maxHeight=maxH+'px'; list.style.width=w+'px'; list.style.left=left+'px';
-    if(useBelow){ list.style.top=(r.bottom+2)+'px'; list.style.bottom='auto'; } else { list.style.bottom=(vh-r.top+2)+'px'; list.style.top='auto'; }
+    if(useBelow){ list.style.top=(r.bottom+2)+'px'; list.style.bottom='auto'; } else { list.style.bottom=(window.innerHeight-r.top+2)+'px'; list.style.top='auto'; }
   }
   const onMove=e=>{ if(open&&!(e&&e.target&&list.contains(e.target))) place(); };
-  function hide(){ open=false; list.remove(); window.removeEventListener('resize',onMove); document.removeEventListener('scroll',onMove,true); }
+  function hide(){ open=false; list.remove(); window.removeEventListener('resize',onMove); document.removeEventListener('scroll',onMove,true); if(window.visualViewport) window.visualViewport.removeEventListener('resize',onMove); }
   inp=h('input',{type:'search','aria-label':label,placeholder:'+ '+label+' (พิมพ์ชื่อหรือรหัส)',autocomplete:'off'});
   function pick(it){ onPick(it); inp.value=''; hide(); }
   function show(){
@@ -1300,15 +1300,19 @@ function itemPicker(onPick, label='เพิ่มจากรายการว
     const all=S.items.filter(i=>{ const t=((i.code||'')+' '+(i.name||'')+' '+(i.category||'')).toLowerCase(); return toks.every(k=>t.includes(k)); }).filter(i=>!gf||catGroup(i.category)===gf).filter(i=>!sc||catNorm(i.category)===sc);
     all.sort((a,b)=>catRank(a.category||'')-catRank(b.category||''));
     cur=all.slice(0,1500); let lastC=null;
-    list.replaceChildren(...(cur.length?cur.flatMap(i=>{ const c=i.category||''; const hd=(c!==lastC)?h('div',{style:'padding:5px 12px;background:#eef2f7;color:#1f2d3d;font-weight:600;position:sticky;top:44px'},catLabel(c)):null; lastC=c; return [hd,h('div',{style:'padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--line)',onmousedown:e=>{e.preventDefault();pick(i);}},
+    list.replaceChildren(...(cur.length?cur.flatMap(i=>{ const c=i.category||''; const hd=(c!==lastC)?h('div',{style:'padding:5px 12px;background:#eef2f7;color:#1f2d3d;font-weight:600;'+(window.innerWidth<700?'':'position:sticky;top:44px')},catLabel(c)):null; lastC=c; return [hd,h('div',{style:'padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--line)',onmousedown:e=>{e.preventDefault();pick(i);}},
       h('div',null,i.name),h('div',{class:'hint'},(i.code||'')+(noCost?'  |  ':'  |  ต้นทุน '+n2(i.cost)+' / ')+(i.unit||'')+'  |  คงเหลือ '+n0(i.stock)+(whText(i)?' ('+whText(i)+')':''))) ]; }).filter(Boolean):[h('div',{class:'hint',style:'padding:8px 10px'},'ไม่พบรายการ')]));
     if(all.length>cur.length) list.append(h('div',{class:'hint',style:'padding:6px 10px'},'แสดง '+cur.length+' จาก '+all.length+' รายการ พิมพ์เพิ่มเพื่อกรอง'));
     else if(cur.length>1) list.prepend(h('div',{class:'hint',style:'padding:4px 12px'},'ทั้งหมด '+cur.length+' รายการ เลื่อนดูได้'));
-    list.prepend(h('div',{style:'display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px;position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);z-index:1'},...[['','ทั้งหมด'],...CAT_GROUPS.map(g=>[g,(CAT_ICON[g]||'')+g])].map(([v,t])=>h('button',{type:'button',class:'btn small'+(gf===v?' primary':''),onmousedown:e=>{ e.preventDefault(); gf=v; sc=''; show(); }},t)),...(gf?CAT_LIST.filter(c=>c.startsWith(gf+' › ')).map(c=>h('button',{type:'button',class:'btn small'+(sc===c?' primary':''),onmousedown:e=>{ e.preventDefault(); sc=(sc===c?'':c); show(); }},c.split(' › ')[1])):[])));
-    if(!open){ open=true; document.body.append(list); window.addEventListener('resize',onMove); document.addEventListener('scroll',onMove,true); }
+    { const nw=window.innerWidth<700, bs=nw?';flex:none;white-space:nowrap':'';
+      const gb=[['','ทั้งหมด'],...CAT_GROUPS.map(g=>[g,(CAT_ICON[g]||'')+g])].map(([v,t])=>h('button',{type:'button',style:bs,class:'btn small'+(gf===v?' primary':''),onmousedown:e=>{ e.preventDefault(); gf=v; sc=''; show(); }},t));
+      const sb=gf?CAT_LIST.filter(c=>c.startsWith(gf+' › ')).map(c=>h('button',{type:'button',style:bs,class:'btn small'+(sc===c?' primary':''),onmousedown:e=>{ e.preventDefault(); sc=(sc===c?'':c); show(); }},c.split(' › ')[1])):[];
+      const row=k=>h('div',{style:nw?'display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:4px 10px;-webkit-overflow-scrolling:touch':'display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px'},...k);
+      list.prepend(h('div',{style:'position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);z-index:1'},...(nw?[row(gb),sb.length?row(sb):null]:[row([...gb,...sb])]).filter(Boolean))); }
+    if(!open){ open=true; document.body.append(list); window.addEventListener('resize',onMove); document.addEventListener('scroll',onMove,true); if(window.visualViewport) window.visualViewport.addEventListener('resize',onMove); }
     place(); list.scrollTop=0;
   }
-  inp.addEventListener('input',show); inp.addEventListener('focus',show); inp.addEventListener('click',show);
+  inp.addEventListener('input',show); inp.addEventListener('focus',()=>{ show(); if(window.innerWidth<700) setTimeout(()=>{ try{ inp.scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} setTimeout(()=>{ if(open) place(); },350); },250); }); inp.addEventListener('click',show);
   inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&cur.length&&open){ e.preventDefault(); pick(cur[0]); } if(e.key==='Escape') hide(); });
   inp.addEventListener('blur',()=>setTimeout(hide,120));
   box.append(inp); return box;
