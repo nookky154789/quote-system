@@ -1223,6 +1223,8 @@ async function saveFile(filename,data){
     const mt={html:'text/html;charset=utf-8',csv:'text/csv;charset=utf-8',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',pdf:'application/pdf'}[(filename.split('.').pop()||'').toLowerCase()]||'text/plain;charset=utf-8';
     const blob=new Blob([data],{type:mt});
     if(window.flutter_inappwebview&&window.flutter_inappwebview.callHandler){ const b64=await new Promise((ok,no)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]||''); r.onerror=no; r.readAsDataURL(blob); }); await window.flutter_inappwebview.callHandler('saveFile',filename,b64,mt); return; }
+    if(!window.IS_DESKTOP&&/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)&&navigator.canShare&&navigator.share){ /* มือถือ: เปิดหน้าต่างแชร์ (บันทึกลงไฟล์ / LINE / อีเมล) */
+      try{ const f=new File([blob],filename,{type:mt}); if(navigator.canShare({files:[f]})){ await navigator.share({files:[f],title:filename}); return; } }catch(e){ if(e&&e.name==='AbortError') return; } }
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.append(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   }catch(e){ toast('บันทึกไฟล์ไม่สำเร็จ'); }
