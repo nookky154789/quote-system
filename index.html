@@ -2292,7 +2292,7 @@ function jaModal(src){
     if(d.start&&d.end&&d.end<d.start){ toast('วันจบต้องไม่ก่อนวันเริ่ม'); return; }
     if(!d.lines.length&&!(d.detail||'').trim()&&!d.tasks.some(t=>(t.text||'').trim())&&d.status!=='done'){ toast('ระบุงานที่ต้องทำหรือรายการวัสดุอย่างน้อย 1 รายการ'); return; }
     if(isNew) d.no=await freshNo(S.settings.jPrefix||'JA',S.ja,d.no);
-    if(await put('ja',d.id,clean())){ if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id).filter(x=>!CU||x!==CU.id)); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
+    if(await put('ja',d.id,clean())){ if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id)); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
   }},'บันทึก'));
   if(!isNew&&typeof SB!=='undefined'&&SB) body.append(jaNotesCard(d));
   openModal((isNew?'มอบหมายงานใหม่':'มอบหมายงาน '+d.no),body,foot);
