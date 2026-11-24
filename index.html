@@ -2464,15 +2464,26 @@ function poModal(src){
     sumUp();
   }
   draw();
+  const supIn=h('input',{id:'po_supplier',value:d.supplier||'',readOnly:!ed,autocomplete:'off',placeholder:'พิมพ์ชื่อร้าน หรือเลือกจากรายการ'}); const supBox=h('div',{style:'position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--panel);border:1px solid var(--line);border-radius:8px;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none'});
+  const supHas=(it,name)=>(it&&it.suppliers||[]).find(x=>x.name===name&&num(x.price)>0);
+  function applySup(name){ d.supplier=name; supIn.value=name; let n=0; d.lines.forEach(l=>{ const it=l.itemId&&S.items.find(i=>i.id===l.itemId); const sp=supHas(it,name); if(sp){ l.price=num(sp.price); n++; } }); draw(); if(n) toast('ใส่ราคาร้าน '+name+' ให้ '+n+' รายการ'); }
+  function showSup(){ if(!ed) return; const q=supIn.value.trim().toLowerCase();
+    const opts=sups.map(nm=>{ let cov=0,sum=0; d.lines.forEach(l=>{ const sp=supHas(l.itemId&&S.items.find(i=>i.id===l.itemId),nm); if(sp){ cov++; sum+=num(sp.price)*num(l.qty); } }); return {nm,cov,sum}; }).filter(o=>!q||o.nm.toLowerCase().includes(q)).sort((a,b)=>b.cov-a.cov||(a.cov&&b.cov?a.sum-b.sum:0)||a.nm.localeCompare(b.nm,'th')).slice(0,30);
+    supBox.replaceChildren(...opts.map(o=>h('div',{style:'padding:7px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line)',onmousedown:e=>{ e.preventDefault(); supBox.style.display='none'; applySup(o.nm); }},h('span',null,o.nm),h('span',{class:'hint'},o.cov?('มีของ '+o.cov+'/'+d.lines.length+' รายการ · '+n2(o.sum)+' บ.'):''))));
+    if(!opts.length&&q) supBox.replaceChildren(h('div',{class:'hint',style:'padding:8px 12px'},'ไม่พบร้านนี้ — จะบันทึกเป็นร้านใหม่ "'+supIn.value.trim()+'"'));
+    supBox.style.display=supBox.children.length?'block':'none'; }
+  supIn.oninput=e=>{ d.supplier=e.target.value; showSup(); }; supIn.onfocus=showSup; supIn.onblur=()=>setTimeout(()=>{ supBox.style.display='none'; if(sups.includes(d.supplier.trim())) applySup(d.supplier.trim()); },150);
+  supIn.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); const f=supBox.firstElementChild; if(f) f.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true})); } };
+  const supField=()=>h('div',{class:'field',style:'position:relative'},h('label',{for:'po_supplier'},'ผู้ขาย / ร้านค้า'),supIn,supBox);
   const inp=(k,l,type='text',extra)=>h('div',{class:'field'},h('label',{for:'po_'+k},l),h('input',{type,id:'po_'+k,value:d[k]||'',readOnly:!ed,oninput:e=>d[k]=e.target.value,...(extra||{})}));
   const stSel=h('select',{id:'po_st',disabled:!ed,onchange:e=>d.status=e.target.value},...Object.entries(PO_ST).map(([k,v])=>h('option',{value:k,selected:k===d.status},v[0])));
   const body=h('div',null,
-    h('div',{class:'grid g4'},inp('no','เลขที่'),inp('date','วันที่','date'),inp('supplier','ผู้ขาย / ร้านค้า','text',{list:'po_sups'}),inp('job','อ้างอิงงาน / ใบเบิก')),
+    h('div',{class:'grid g4'},inp('no','เลขที่'),inp('date','วันที่','date'),supField(),inp('job','อ้างอิงงาน / ใบเบิก')),
     h('datalist',{id:'po_sups'},...sups.map(s=>h('option',{value:s}))),
     h('div',{class:'field',style:'max-width:240px;margin-top:8px'},h('label',{for:'po_st'},'สถานะ'),stSel),
     h('h2',{style:'margin-top:14px'},'รายการสั่งซื้อ'),
     h('div',{class:'tablewrap'},h('table',null,h('thead',null,h('tr',null,h('th',null,'รหัส'),h('th',null,'รายการ'),h('th',null,'จำนวน'),h('th',null,'หน่วย'),h('th',null,'ราคา/หน่วย'),h('th',{class:'num'},'รับแล้ว'),h('th',null,''))),tb)),
-    ed?h('div',{class:'bar',style:'margin-top:8px'},h('div',{style:'min-width:260px'},itemPicker(it=>{ if(d.lines.some(l=>l.itemId===it.id)){ toast('มีรายการนี้แล้ว'); return; } const b=bestSup(it); d.lines.push({k:uid(),itemId:it.id,code:it.code||'',name:it.name,unit:it.unit||'',qty:1,price:b.price,recv:0}); if(!d.supplier&&b.name!==NO_SUP){ d.supplier=b.name; const si=document.getElementById('po_supplier'); if(si) si.value=b.name; } draw(); },'เพิ่มวัสดุที่จะสั่ง'))):null,
+    ed?h('div',{class:'bar',style:'margin-top:8px'},h('div',{style:'min-width:260px'},itemPicker(it=>{ if(d.lines.some(l=>l.itemId===it.id)){ toast('มีรายการนี้แล้ว'); return; } const b=bestSup(it); d.lines.push({k:uid(),itemId:it.id,code:it.code||'',name:it.name,unit:it.unit||'',qty:1,price:b.price,recv:0}); if(!d.supplier&&b.name!==NO_SUP){ d.supplier=b.name; supIn.value=b.name; } else if(d.supplier&&supHas(it,d.supplier)) d.lines[d.lines.length-1].price=num(supHas(it,d.supplier).price); draw(); },'เพิ่มวัสดุที่จะสั่ง'))):null,
     tot,
     h('div',{class:'field',style:'margin-top:10px'},h('label',{for:'po_note'},'หมายเหตุ'),h('textarea',{id:'po_note',readOnly:!ed,oninput:e=>d.note=e.target.value},d.note||'')));
   const foot=[];
