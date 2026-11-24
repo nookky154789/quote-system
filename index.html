@@ -689,6 +689,7 @@ function mobileMenu(){
   const body=h('div',{style:'display:grid;gap:10px'},
     h('div',{class:'card'},h('b',null,CU?(CU.name||CU.username):''),h('div',{class:'hint'},CU?roleLabel(CU):'')),
     isAdmin()?h('button',{class:'btn',onclick:()=>{closeModal();prefModal();}},'🎛 ตั้งค่าการแสดงผล'):null,
+    (typeof SB!=='undefined'&&SB)?h('button',{class:'btn',onclick:()=>{closeModal();lineModal();}},'🔔 ผูก LINE'):null,
     h('button',{class:'btn',onclick:()=>{closeModal();changeMyPw();}},'🔑 เปลี่ยนรหัสผ่าน'),
     h('button',{class:'btn danger',onclick:()=>{closeModal();logout();}},'ออกจากระบบ'));
   openModal('บัญชีผู้ใช้',body,[h('button',{class:'btn',onclick:closeModal},'ปิด')]);
@@ -700,7 +701,7 @@ function buildRail(){
     rail.append(b);
   });
   rail.append(h('div',{class:'hint',style:'margin-top:auto;padding:8px 10px'},'ผู้ใช้: ',h('b',null,CU?(CU.name||CU.username):''),' · ',CU?roleLabel(CU):''),
-    isAdmin()?h('button',{class:'xtra',onclick:prefModal},h('span',null,'🎛 ตั้งค่าการแสดงผล')):null,h('button',{class:'xtra',onclick:changeMyPw},h('span',null,'เปลี่ยนรหัสผ่าน')),h('button',{class:'xtra',onclick:logout},h('span',null,'ออกจากระบบ')));
+    isAdmin()?h('button',{class:'xtra',onclick:prefModal},h('span',null,'🎛 ตั้งค่าการแสดงผล')):null,(typeof SB!=='undefined'&&SB)?h('button',{class:'xtra',onclick:lineModal},h('span',null,'🔔 ผูก LINE')):null,h('button',{class:'xtra',onclick:changeMyPw},h('span',null,'เปลี่ยนรหัสผ่าน')),h('button',{class:'xtra',onclick:logout},h('span',null,'ออกจากระบบ')));
 }
 function updateRail(){
   const counts={monitor:vja().filter(x=>x.status!=='done'&&(hasAll()||jaMine(x))).length,ja:vja().filter(x=>x.status!=='done').length,jobs:S.jobs.length,boms:S.boms.length,items:S.items.length,estimates:S.estimates.length,quotes:S.quotes.length,withdrawals:vwd().length,po:S.po.filter(p=>!['received','cancelled'].includes(p.status)).length,count:S.counts.filter(c=>c.status!=='applied').length};
@@ -2132,7 +2133,7 @@ async function jaToggleDone(a,on){
   const r=strip(a);
   if(on){ r.status='done'; r.doneAt=new Date().toISOString(); r.doneBy=(CU&&(CU.name||CU.username))||''; }
   else { r.status='open'; delete r.doneAt; delete r.doneBy; }
-  if(await put('ja',a.id,r)){ if(on) linePush('✅ งาน '+a.no+' '+(a.title||'')+' เสร็จแล้ว โดย '+logBy()); toast(on?a.no+' เสร็จแล้ว — ย้ายไปแท็บ "แล้วเสร็จ"':a.no+' เปิดงานอีกครั้ง'); } else render();
+  if(await put('ja',a.id,r)){ if(on) linePush('✅ งาน '+a.no+' '+(a.title||'')+' เสร็จแล้ว โดย '+logBy(),false,[a.createdById].concat((a.assignees||[]).map(x=>x.id)).filter(x=>!CU||x!==CU.id)); toast(on?a.no+' เสร็จแล้ว — ย้ายไปแท็บ "แล้วเสร็จ"':a.no+' เปิดงานอีกครั้ง'); } else render();
 }
 function jaWithdraw(a){
   if(!canEdit('withdrawals')){ toast('คุณไม่มีสิทธิ์สร้างใบเบิก'); return; }
@@ -2291,7 +2292,7 @@ function jaModal(src){
     if(d.start&&d.end&&d.end<d.start){ toast('วันจบต้องไม่ก่อนวันเริ่ม'); return; }
     if(!d.lines.length&&!(d.detail||'').trim()&&!d.tasks.some(t=>(t.text||'').trim())&&d.status!=='done'){ toast('ระบุงานที่ต้องทำหรือรายการวัสดุอย่างน้อย 1 รายการ'); return; }
     if(isNew) d.no=await freshNo(S.settings.jPrefix||'JA',S.ja,d.no);
-    if(await put('ja',d.id,clean())){ if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.assignees.length?' → '+d.assignees.map(x=>x.name).join(', '):'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
+    if(await put('ja',d.id,clean())){ if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id).filter(x=>!CU||x!==CU.id)); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
   }},'บันทึก'));
   if(!isNew&&typeof SB!=='undefined'&&SB) body.append(jaNotesCard(d));
   openModal((isNew?'มอบหมายงานใหม่':'มอบหมายงาน '+d.no),body,foot);
@@ -2414,9 +2415,22 @@ function stockMove(it,delta,wh,logText){
 const mvAdd=(type,it,qty,ref,extra)=>put('moves',uid(),{type,itemId:it?it.id:'',name:it?it.name:'',qty,by:(CU&&CU.username)||'',byId:(CU&&CU.id)||undefined,requester:(CU&&(CU.name||CU.username))||'',date:today(),ref,ts:Date.now(),...(extra||{})});
 
 /* ---------- LINE ---------- */
-async function linePush(text,force){
-  try{ if((!force&&!(S.settings||{}).lineOn)||typeof SB==='undefined'||!SB) return null;
-    const {data,error}=await SB.functions.invoke('line-push',{body:{text}}); return error?{ok:false,error:error.message}:data; }catch(e){ return {ok:false,error:String(e&&e.message||e)}; }
+async function linePush(text,force,ids){
+  try{ if((!force&&(S.settings||{}).lineOn===false)||typeof SB==='undefined'||!SB) return null;
+    ids=[...new Set((ids||[]).filter(Boolean))]; if(!ids.length) return null;
+    const {data,error}=await SB.functions.invoke('line-push',{body:{text,userIds:ids}}); return error?{ok:false,error:error.message}:data; }catch(e){ return {ok:false,error:String(e&&e.message||e)}; }
+}
+async function lineModal(){
+  const box=h('div',null,h('div',{class:'hint'},'กำลังโหลด…'));
+  const draw=async()=>{
+    const {data:st}=await SB.rpc('line_status'); const linked=!!st;
+    box.replaceChildren(linked?h('div',null,h('div',{class:'card'},'✅ ผูกบัญชี LINE แล้ว — คุณจะได้รับแจ้งเตือนงานที่เกี่ยวกับคุณ'),
+        h('div',{class:'bar',style:'margin-top:8px'},h('button',{class:'btn small',onclick:async()=>{ const r=await linePush('🔔 ทดสอบแจ้งเตือนส่วนตัว',true,[CU.id]); toast(r&&r.ok?'ส่งแล้ว':'ส่งไม่ได้: '+((r&&r.error)||'')); }},'ส่งข้อความทดสอบถึงฉัน'),
+          h('button',{class:'btn small danger',onclick:async()=>{ if(!(await ask('ยกเลิกการผูก LINE?'))) return; await SB.rpc('line_unlink'); draw(); }},'ยกเลิกการผูก')))
+      :h('div',null,h('div',{class:'hint'},'1) เพิ่มเพื่อนบัญชี LINE Official ของบริษัท  2) กดปุ่มด้านล่างเพื่อรับรหัส 6 หลัก  3) พิมพ์รหัสส่งในแชทของ OA ภายใน 10 นาที'),
+        h('div',{class:'bar',style:'margin-top:8px'},h('button',{class:'btn primary',onclick:async()=>{ const {data,error}=await SB.rpc('line_make_code'); if(error){ toast('ไม่สำเร็จ: '+errMsg(error)); return; } const code=data; box.replaceChildren(h('div',{class:'card',style:'text-align:center'},h('div',{class:'hint'},'ส่งรหัสนี้ให้ LINE OA (หมดอายุใน 10 นาที)'),h('div',{style:'font-size:34px;font-weight:700;letter-spacing:6px;margin:8px 0'},String(code))),h('div',{class:'bar',style:'margin-top:8px'},h('button',{class:'btn',onclick:draw},'ผูกเสร็จแล้ว / รีเฟรช'))); }},'ขอรหัสผูก LINE'))));
+  };
+  openModal('ผูกบัญชี LINE',box,[h('button',{class:'btn',onclick:closeModal},'ปิด')]); draw();
 }
 
 /* ---------- ใบสั่งซื้อ (PO) ---------- */
@@ -2665,6 +2679,7 @@ function vAudit(){
 function opsCard(){
   if(!isAdmin()) return null;
   const online=typeof SB!=='undefined'&&SB;
+  const lineList=h('div',{class:'hint',style:'margin-top:6px'},''); if(online) SB.rpc('admin_line_links').then(({data})=>{ lineList.textContent='ผูก LINE แล้ว '+(data||[]).length+' คน'+((data||[]).length?': '+data.map(x=>x.name).join(', '):''); });
   const snapBox=h('div',{class:'hint'},online?'กำลังโหลด…':'ใช้ได้เฉพาะเวอร์ชันออนไลน์');
   const loadSnap=async()=>{ if(!online) return; const {data,error}=await SB.rpc('admin_snapshot_info'); if(error){ snapBox.textContent='โหลดไม่ได้: '+errMsg(error); return; }
     snapBox.replaceChildren(...(data&&data.length?data.slice(0,6).map(s=>h('div',null,'📸 '+logTs(s.snap_at)+' — '+n0(s.n)+' รายการ')):[h('span',null,'ยังไม่มีสแนปช็อต')]),h('div',{style:'margin-top:4px'},'ระบบถ่ายสแนปช็อตอัตโนมัติทุกสัปดาห์ (เก็บย้อนหลังบนเซิร์ฟเวอร์) — กู้คืนผ่านผู้ดูแลระบบ/แจ้งผู้พัฒนา')); };
@@ -2677,9 +2692,9 @@ function opsCard(){
       online?h('button',{class:'btn',onclick:()=>{ view='audit'; render(); }},'ดูประวัติการแก้ไข (Audit)'):null),
     h('div',{style:'margin-top:8px'},snapBox),
     online?h('div',{style:'margin-top:12px;border-top:1px solid var(--line);padding-top:10px'},
-      h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:!!S.settings.lineOn,onchange:async e=>{ if(await putSettings({...S.settings,lineOn:e.target.checked})) toast(e.target.checked?'เปิดแจ้งเตือน LINE':'ปิดแจ้งเตือน LINE'); }}),'แจ้งเตือน LINE เมื่อมอบหมายงานใหม่ / งานเสร็จ'),
-      h('div',{class:'hint',style:'margin:4px 0'},'ต้องตั้งค่า LINE_TOKEN (Channel access token ของ LINE Official Account) และ LINE_TARGET (userId/groupId; เว้นว่าง = ส่งถึงผู้ติดตามทุกคน) ใน Supabase → Edge Functions → line-push → Secrets'),
-      h('button',{class:'btn small',onclick:async()=>{ lineRes.textContent='กำลังส่ง…'; const r=await linePush('🔔 ทดสอบแจ้งเตือนจากระบบประมาณราคา',true); lineRes.textContent=r&&r.ok?'ส่งสำเร็จ':'ยังส่งไม่ได้: '+((r&&r.error)||'ไม่ทราบสาเหตุ'); }},'ส่งข้อความทดสอบ'),lineRes):null);
+      h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:S.settings.lineOn!==false,onchange:async e=>{ if(await putSettings({...S.settings,lineOn:e.target.checked})) toast(e.target.checked?'เปิดแจ้งเตือน LINE':'ปิดแจ้งเตือน LINE'); }}),'แจ้งเตือน LINE รายคน เมื่อมอบหมายงานใหม่ / งานเสร็จ'),
+      h('div',{class:'hint',style:'margin:4px 0'},'ผู้ใช้แต่ละคนกด "🔔 ผูก LINE" ที่เมนูเพื่อผูกบัญชีของตัวเอง · ระบบส่งหาเฉพาะผู้ที่เกี่ยวข้อง'),
+      h('button',{class:'btn small',onclick:async()=>{ lineRes.textContent='กำลังส่ง…'; const r=await linePush('🔔 ทดสอบแจ้งเตือนจากระบบประมาณราคา',true,[CU.id]); lineRes.textContent=r&&r.ok?'ส่งสำเร็จ':'ยังส่งไม่ได้: '+((r&&r.error)||'ไม่ทราบสาเหตุ'); }},'ส่งข้อความทดสอบ'),lineRes,lineList):null);
 }
 
 /* ---------- สแกน QR / บาร์โค้ด + ป้าย QR ---------- */
