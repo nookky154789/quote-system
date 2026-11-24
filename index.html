@@ -2135,7 +2135,7 @@ async function jaToggleDone(a,on){
   const r=strip(a);
   if(on){ r.status='done'; r.doneAt=new Date().toISOString(); r.doneBy=(CU&&(CU.name||CU.username))||''; }
   else { r.status='open'; delete r.doneAt; delete r.doneBy; }
-  if(await put('ja',a.id,r)){ if(on) linePush('✅ งาน '+a.no+' '+(a.title||'')+' เสร็จแล้ว โดย '+logBy(),false,[a.createdById].concat((a.assignees||[]).map(x=>x.id)).filter(x=>!CU||x!==CU.id),{head:'✅ งานเสร็จแล้ว',color:'#2e8b57',title:a.no+' '+(a.title||''),lines:['โดย '+logBy()],go:'monitor'}); toast(on?a.no+' เสร็จแล้ว — ย้ายไปแท็บ "แล้วเสร็จ"':a.no+' เปิดงานอีกครั้ง'); } else render();
+  if(await put('ja',a.id,r)){ if(on) linePush('✅ งาน '+a.no+' '+(a.title||'')+' เสร็จแล้ว โดย '+logBy(),false,[a.createdById].concat((a.assignees||[]).map(x=>x.id)).filter(x=>!CU||x!==CU.id),{head:'✅ งานเสร็จแล้ว',color:'#2e8b57',title:a.no+' '+(a.title||''),lines:['โดย '+logBy()].concat(jaBrief(a)),go:'monitor',jaId:a.id}); toast(on?a.no+' เสร็จแล้ว — ย้ายไปแท็บ "แล้วเสร็จ"':a.no+' เปิดงานอีกครั้ง'); } else render();
 }
 function jaWithdraw(a){
   if(!canEdit('withdrawals')){ toast('คุณไม่มีสิทธิ์สร้างใบเบิก'); return; }
@@ -2296,7 +2296,7 @@ function jaModal(src){
     if(isNew) d.no=await freshNo(S.settings.jPrefix||'JA',S.ja,d.no);
     const cl0=clean(); const newIds=(d.assignees||[]).filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id);
     const chg=[]; if(!isNew){ const J=x=>JSON.stringify(x||''); if((src.title||'')!==(cl0.title||'')) chg.push('ชื่องาน'); if((src.customer||'')!==(cl0.customer||'')) chg.push('ลูกค้า'); if((src.detail||'')!==(cl0.detail||'')) chg.push('รายละเอียด'); if((src.start||'')!==(cl0.start||'')||(src.end||'')!==(cl0.end||'')) chg.push('กำหนดเวลา'); if(J((src.lines||[]).map(l=>[l.id||l.name,l.qty]))!==J((cl0.lines||[]).map(l=>[l.id||l.name,l.qty]))) chg.push('รายการวัสดุ'); if(J((src.tasks||[]).map(t=>[t.text,t.who&&t.who.id]))!==J((cl0.tasks||[]).map(t=>[t.text,t.who&&t.who.id]))) chg.push('งานที่ต้องทำ'); }
-    if(await put('ja',d.id,cl0)){ if(chg.length) linePush('✏️ แก้ไขงาน '+d.no+' '+(d.title||'')+' ('+chg.join(', ')+') โดย '+logBy(),false,[cl0.createdById||src.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&!newIds.includes(x)&&(!CU||x!==CU.id)),{head:'✏️ แก้ไขงาน',color:'#b7791f',title:d.no+' '+(d.title||''),lines:['แก้ไข: '+chg.join(', '),'โดย '+logBy()],go:'monitor'}); if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id),{head:'📋 มอบหมายงานใหม่',title:d.no+' '+(d.title||''),lines:[d.customer||'',d.end?'กำหนด '+thDate(d.end):'','โดย '+logBy()].filter(Boolean),go:'monitor'}); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
+    if(await put('ja',d.id,cl0)){ if(chg.length) linePush('✏️ แก้ไขงาน '+d.no+' '+(d.title||'')+' ('+chg.join(', ')+') โดย '+logBy(),false,[cl0.createdById||src.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&!newIds.includes(x)&&(!CU||x!==CU.id)),{head:'✏️ แก้ไขงาน',color:'#b7791f',title:d.no+' '+(d.title||''),lines:['แก้ไข: '+chg.join(', '),'โดย '+logBy()].concat(jaBrief(cl0)),go:'monitor',jaId:d.id}); if(isNew||(d.assignees||[]).some(x=>!(src.assignees||[]).some(y=>y.id===x.id))) linePush('📋 มอบหมายงาน '+d.no+' '+(d.title||'')+(d.end?' (กำหนด '+thDate(d.end)+')':'')+' โดย '+logBy(),false,d.assignees.filter(x=>!(src.assignees||[]).some(y=>y.id===x.id)).map(x=>x.id),{head:'📋 มอบหมายงานใหม่',title:d.no+' '+(d.title||''),lines:jaBrief(cl0).concat(['โดย '+logBy()]),go:'monitor',jaId:d.id}); jaMarkSeen({id:d.id,assignees:d.assignees}); updateRail(); closeModal(); toast(d.status==='done'?'บันทึกแล้ว — ย้ายไปแล้วเสร็จ':'บันทึก JA แล้ว'); }
   }},'บันทึก'));
   if(!isNew&&typeof SB!=='undefined'&&SB) body.append(jaNotesCard(d));
   openModal((isNew?'มอบหมายงานใหม่':'มอบหมายงาน '+d.no),body,foot);
@@ -2424,6 +2424,7 @@ async function linePush(text,force,ids,card){
     ids=[...new Set((ids||[]).filter(Boolean))]; if(!ids.length) return null;
     const {data,error}=await SB.functions.invoke('line-push',{body:{text,userIds:ids,card}}); return error?{ok:false,error:error.message}:data; }catch(e){ return {ok:false,error:String(e&&e.message||e)}; }
 }
+function jaBrief(a){ const L=[]; if(a.customer) L.push('ลูกค้า: '+a.customer); if(a.end) L.push('กำหนด: '+thDate(a.end)); const as=(a.assignees||[]).map(x=>x.name).join(', '); if(as) L.push('ผู้รับผิดชอบ: '+as); if(a.detail) L.push(String(a.detail).slice(0,160)); const T=a.tasks||[]; if(T.length) L.push('งานที่ต้องทำ '+T.filter(t=>t.done).length+'/'+T.length+': '+T.slice(0,4).map(t=>t.text).join(', ')); const M=a.lines||[]; if(M.length) L.push('วัสดุที่ต้องเบิก '+M.length+' รายการ (ดูใบเบิกของ PDF ด้านล่าง)'); return L; }
 async function lineModal(){
   const box=h('div',null,h('div',{class:'hint'},'กำลังโหลด…'));
   const draw=async()=>{
@@ -2754,7 +2755,7 @@ function jaNotesCard(d){
     try{
       for(const f of files.slice(0,8)){ const blob=await imgBlob(f); const path='ja/'+d.id+'/'+uid()+'.jpg'; const {error}=await SB.storage.from('ja-files').upload(path,blob,{contentType:'image/jpeg'}); if(error) throw error; paths.push(path); }
       const {data,error}=await SB.rpc('ja_add_note',{p_ja:d.id,p_note:{text,files:paths}}); if(error) throw error;
-      d.notes=(data&&data.notes)||d.notes; linePush('📝 บันทึกใหม่ในงาน '+d.no+' '+(d.title||'')+' โดย '+logBy()+(text?': '+text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),false,[d.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&(!CU||x!==CU.id)),{head:'📝 บันทึกใหม่',color:'#6b4fa0',title:d.no+' '+(d.title||''),lines:[(text?text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),'โดย '+logBy()].filter(x=>x.trim()),go:'monitor'}); const a=S.ja.find(x=>x.id===d.id); if(a) a.notes=d.notes; ta.value=''; fi.value=''; draw(); toast('บันทึกแล้ว');
+      d.notes=(data&&data.notes)||d.notes; linePush('📝 บันทึกใหม่ในงาน '+d.no+' '+(d.title||'')+' โดย '+logBy()+(text?': '+text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),false,[d.createdById].concat((d.assignees||[]).map(x=>x.id)).filter(x=>x&&(!CU||x!==CU.id)),{head:'📝 บันทึกใหม่',color:'#6b4fa0',title:d.no+' '+(d.title||''),lines:[(text?text.slice(0,200):'')+(paths.length?' (แนบรูป '+paths.length+')':''),'โดย '+logBy()].filter(x=>x.trim()),go:'monitor',jaId:d.id}); const a=S.ja.find(x=>x.id===d.id); if(a) a.notes=d.notes; ta.value=''; fi.value=''; draw(); toast('บันทึกแล้ว');
     }catch(e){ toast('บันทึกไม่สำเร็จ: '+errMsg(e)); }
     btn.disabled=false; btn.textContent='เพิ่มบันทึก';
   }},'เพิ่มบันทึก');
