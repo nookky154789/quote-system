@@ -2829,7 +2829,11 @@ function opsCard(){
   const lead=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px'});
   const drawLead=()=>{ if(!TEAM.length){ lead.replaceChildren(h('span',{class:'hint'},_teamLoaded?'ไม่พบรายชื่อผู้ใช้':'กำลังโหลดรายชื่อ…')); return; }
     lead.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:leaderIds().includes(u.id),onchange:async e=>{ const cur=new Set(leaderIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,leaders:[...cur]})) toast('บันทึกหัวหน้าทีมแล้ว'); }}),u.name))); };
-  if(online){ drawLead(); if(!_teamLoaded||!TEAM.length) loadTeam().then(drawLead); }
+  const stk=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px'});
+  const stkIds=()=>((S.settings||{}).stockUpdaters||[]).filter(Boolean);
+  const drawStk=()=>{ if(!TEAM.length){ stk.replaceChildren(h('span',{class:'hint'},_teamLoaded?'ไม่พบรายชื่อผู้ใช้':'กำลังโหลดรายชื่อ…')); return; }
+    stk.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:stkIds().includes(u.id),onchange:async e=>{ const cur=new Set(stkIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,stockUpdaters:[...cur]})) toast('บันทึกผู้อัปเดตสต๊อกแล้ว'); }}),u.name))); };
+  if(online){ drawLead(); drawStk(); if(!_teamLoaded||!TEAM.length) loadTeam().then(()=>{ drawLead(); drawStk(); }); }
   const lineRes=h('div',{class:'hint'});
   return h('div',{class:'card',style:'margin-bottom:14px'},h('b',null,'สำรองข้อมูล · Audit · แจ้งเตือน LINE (ผู้ดูแล)'),
     h('div',{class:'bar',style:'margin-top:8px'},
@@ -2840,6 +2844,7 @@ function opsCard(){
     online?h('div',{style:'margin-top:12px;border-top:1px solid var(--line);padding-top:10px'},
       h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:S.settings.lineOn!==false,onchange:async e=>{ if(await putSettings({...S.settings,lineOn:e.target.checked})) toast(e.target.checked?'เปิดแจ้งเตือน LINE':'ปิดแจ้งเตือน LINE'); }}),'แจ้งเตือน LINE รายคน เมื่อมอบหมายงานใหม่ / งานเสร็จ'),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'👑 หัวหน้าทีม'),h('div',{class:'hint'},'ได้รับแจ้งทาง LINE เมื่องานเสร็จ และเมื่อลูกทีมอัปเดต/ส่งงาน/ติ๊กงาน/ขอเบิกของ (ติ๊กได้หลายคน)'),lead),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'📦 ผู้มีสิทธิ์อัปเดตสต๊อกทาง LINE'),h('div',{class:'hint'},'ผู้ดูแลระบบ (admin) ทำได้เสมอ · ติ๊กเพิ่มเพื่อให้คนอื่นพิมพ์ "อัพเดทสต๊อก" แล้วส่งไฟล์ CSV จาก Express ได้ (ต้องผูก LINE แล้ว)'),stk),
       h('div',{class:'hint',style:'margin:4px 0'},'ผู้ใช้แต่ละคนกด "🔔 ผูก LINE" ที่เมนูเพื่อผูกบัญชีของตัวเอง · ระบบส่งหาเฉพาะผู้ที่เกี่ยวข้อง'),
       h('button',{class:'btn small',onclick:async()=>{ lineRes.textContent='กำลังส่ง…'; const r=await linePush('🔔 ทดสอบแจ้งเตือนจากระบบประมาณราคา',true,[CU.id]); lineRes.textContent=r&&r.ok?'ส่งสำเร็จ':'ยังส่งไม่ได้: '+((r&&r.error)||'ไม่ทราบสาเหตุ'); }},'ส่งข้อความทดสอบ'),h('button',{class:'btn small',style:'margin-left:6px',onclick:async()=>{ lineRes.textContent='กำลังตั้งเมนู…'; try{ const {data,error}=await SB.functions.invoke('line-setup',{body:{}}); lineRes.textContent=error?('ไม่สำเร็จ: '+error.message):(data&&data.ok?'ตั้งเมนู LINE OA สำเร็จ (อาจใช้เวลาสักครู่กว่าจะขึ้นในแชท)':'ไม่สำเร็จ: '+((data&&data.error)||'')); }catch(e){ lineRes.textContent='ไม่สำเร็จ: '+(e.message||e); } }},'ตั้ง/อัปเดตเมนู LINE OA'),lineRes,lineList):null);
 }
