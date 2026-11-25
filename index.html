@@ -873,7 +873,9 @@ function vItems(){
     h('select',{style:'width:auto;max-width:260px','aria-label':'กรองหมวด',onchange:e=>{itemCat=e.target.value;renderItemRows();}},...catOpts()),
     h('select',{style:'width:auto','aria-label':'จำนวนที่แสดง',onchange:e=>{itemLimit=+e.target.value;renderItemRows();}},...[[0,'แสดงทั้งหมด'],[200,'แสดง 200'],[500,'แสดง 500'],[1000,'แสดง 1,000']].map(([k,t])=>h('option',{value:k,selected:k===itemLimit},t))),
     canEdit('items')?h('button',{class:'btn primary',onclick:()=>itemModal()},'เพิ่มวัสดุ'):null,
+    canEdit('items')?h('button',{class:'btn primary',title:'อัปโหลดไฟล์ Excel/CSV ที่ส่งออกจาก Express — ระบบเทียบกับของเดิมและอัปเดตให้',onclick:expImportModal},'⬆ อัปเดตสต๊อกจาก Express'):null,
     canEdit('items')?h('button',{class:'btn',onclick:importModal},'นำเข้าจากตาราง'):null,
+    (S.settings&&S.settings.expressImport)?h('span',{class:'hint',title:'จาก '+S.settings.expressImport.file},'อัปเดตจาก Express ล่าสุด '+logTs(S.settings.expressImport.ts)+' · สต๊อก '+n0(S.settings.expressImport.upd)+' · ต้นทุน '+n0(S.settings.expressImport.cost)+' · ใหม่ '+n0(S.settings.expressImport.add)):null,
     h('button',{class:'btn',onclick:()=>scanItem(it=>itemModal(it))},'📷 สแกน'),
     h('button',{class:'btn',title:'พิมพ์ป้าย QR ตามรายการที่กรองอยู่ (ทุกรายการ แบ่งหน้า A4 อัตโนมัติ)',onclick:()=>labelPrint(_itemList||[])},'พิมพ์ป้าย QR'),
     isAdmin()&&S.items.some(i=>i.stockWh)?h('button',{class:'btn',onclick:whModal},'ตั้งชื่อคลัง'):null,
@@ -939,6 +941,83 @@ function mvSummaryCard(){
   }
   draw(); return box;
 }
+
+/* ===== นำเข้า / อัปเดตสต๊อกจากไฟล์ Express (Excel / CSV) ===== */
+const EXP_COLS=[['code','รหัสสินค้า',/รหัส|code|item\s*no|sku/i],['name','ชื่อสินค้า',/ชื่อ|รายการ|description|name|desc/i],['unit','หน่วย',/หน่วย|unit|uom/i],['qty','จำนวนคงเหลือ',/คงเหลือ|ยอด|จำนวน|balance|qty|quantity|stock/i],['cost','ต้นทุน / ราคา',/ต้นทุน|ราคาทุน|ราคา|cost|price/i]];
+async function expParseFile(f){
+  const ext=(f.name.split('.').pop()||'').toLowerCase();
+  if(['xlsx','xls','xlsm'].includes(ext)){
+    await loadJs('vendor/xlsx.full.min.js');
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}); const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}).map(r=>r.map(c=>c==null?'':c));
+  }
+  let t; const buf=await f.arrayBuffer(); try{ t=new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ t=new TextDecoder('windows-874').decode(buf); }
+  return expParseText(t);
+}
+function expParseText(t){ return t.split(/\r?\n/).filter(l=>l.trim()).map(l=>{ const d=l.includes('\t')?'\t':','; return d==='\t'?l.split('\t').map(c=>c.replace(/^"|"$/g,'').trim()):l.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c=>c.replace(/^"|"$/g,'').trim()); }); }
+function expNum(v){ if(typeof v==='number') return v; const x=parseFloat(String(v==null?'':v).replace(/[,\s฿]/g,'').replace(/^\((.*)\)$/,'-$1')); return isNaN(x)?null:x; }
+function expDetect(rows){
+  let hi=0,best=-1; rows.slice(0,15).forEach((r,i)=>{ const sc=r.filter(c=>typeof c==='string'&&EXP_COLS.some(([,,re])=>re.test(c))).length; if(sc>best){ best=sc; hi=i; } });
+  const head=(rows[hi]||[]).map((c,i)=>String(c||'').trim()||('คอลัมน์ '+(i+1))); const map={};
+  EXP_COLS.forEach(([k,,re])=>{ let ix=head.findIndex((c,i)=>re.test(c)&&!Object.values(map).includes(i)); map[k]=ix; });
+  if(map.qty>=0&&map.qty===map.cost) map.cost=-1;
+  return {hi,head,map};
+}
+function expPlan(rows,hi,map,opt){
+  const by=new Map(); S.items.forEach(i=>{ if(i.code) by.set(String(i.code).trim().toLowerCase(),i); });
+  const seen=new Set(), P={upd:[],cost:[],add:[],same:0,miss:0,skip:0};
+  rows.slice(hi+1).forEach(r=>{
+    const code=map.code>=0?String(r[map.code]==null?'':r[map.code]).trim():''; const name=map.name>=0?String(r[map.name]||'').trim():'';
+    if(!code&&!name){ P.skip++; return; } const q=map.qty>=0?expNum(r[map.qty]):null, c=map.cost>=0?expNum(r[map.cost]):null, unit=map.unit>=0?String(r[map.unit]||'').trim():'';
+    const it=code?by.get(code.toLowerCase()):null;
+    if(it){ seen.add(it.id); let ch=false;
+      if(opt.qty&&q!=null&&num(it.stock)!==q){ P.upd.push({it,from:num(it.stock),to:q}); ch=true; }
+      if(opt.cost&&c!=null&&c>0&&Math.abs(num(it.cost)-c)>0.0049){ P.cost.push({it,from:num(it.cost),to:c}); ch=true; }
+      if(!ch) P.same++; }
+    else if(opt.add&&name){ P.add.push({code,name,unit:unit||'ชิ้น',qty:q||0,cost:c||0}); }
+    else P.skip++;
+  });
+  P.miss=S.items.filter(i=>i.code&&!seen.has(i.id)).length; return P;
+}
+function expImportModal(){
+  if(!canEdit('items')){ toast('คุณไม่มีสิทธิ์แก้ไขวัสดุ'); return; }
+  let rows=[], det=null, srcName='';
+  const opt={qty:true,cost:true,add:true};
+  const box=h('div'), prev=h('div',{style:'margin-top:10px'});
+  const ta=h('textarea',{rows:3,placeholder:'หรือคัดลอกตารางจาก Excel/Express มาวางที่นี่',style:'width:100%',oninput:e=>{ rows=expParseText(e.target.value); srcName='ข้อมูลที่วาง'; setup(); }});
+  const fi=h('input',{type:'file',accept:'.xlsx,.xls,.xlsm,.csv,.txt',onchange:async e=>{ const f=e.target.files[0]; if(!f) return; try{ rows=await expParseFile(f); srcName=f.name; setup(); }catch(er){ toast('อ่านไฟล์ไม่ได้: '+(er&&er.message||er)); } }});
+  const cols=h('div',{style:'display:flex;gap:10px;flex-wrap:wrap;margin-top:8px'});
+  function setup(){ if(!rows.length){ cols.replaceChildren(); prev.replaceChildren(); return; } det=expDetect(rows);
+    cols.replaceChildren(h('div',{class:'hint',style:'width:100%'},'ไฟล์: '+srcName+' · '+(rows.length-det.hi-1)+' แถว · ตรวจพบหัวตารางที่แถว '+(det.hi+1)+' (แก้การจับคู่คอลัมน์ได้)'),
+      ...EXP_COLS.map(([k,l])=>h('label',{style:'display:grid;gap:2px;font-size:12px'},l,h('select',{style:'width:auto','aria-label':l,onchange:e=>{ det.map[k]=+e.target.value; draw(); }},h('option',{value:-1,selected:det.map[k]<0},'— ไม่ใช้ —'),...det.head.map((c,i)=>h('option',{value:i,selected:det.map[k]===i},c))))));
+    draw(); }
+  function draw(){ if(!det) return; if(det.map.code<0){ prev.replaceChildren(h('div',{class:'warnline'},'เลือกคอลัมน์ "รหัสสินค้า" ก่อน เพื่อจับคู่กับสินค้าในระบบ')); return; }
+    const P=expPlan(rows,det.hi,det.map,opt); det.P=P;
+    const tile=(t,n,c)=>h('div',{class:'card',style:'padding:8px 12px;min-width:120px'},h('div',{class:'hint'},t),h('div',{style:'font-size:20px;font-weight:700;color:'+(c||'inherit')},n0(n)));
+    const chk=(k,t)=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:opt[k],onchange:e=>{ opt[k]=e.target.checked; draw(); }}),t);
+    const lst=P.upd.slice(0,150).map(x=>h('tr',null,h('td',{class:'mono'},x.it.code),h('td',null,x.it.name),h('td',{class:'num'},'สต๊อก'),h('td',{class:'num'},n0(x.from)+' → '+n0(x.to)))).concat(P.cost.slice(0,150).map(x=>h('tr',null,h('td',{class:'mono'},x.it.code),h('td',null,x.it.name),h('td',{class:'num'},'ต้นทุน'),h('td',{class:'num'},n2(x.from)+' → '+n2(x.to)))),P.add.slice(0,100).map(x=>h('tr',null,h('td',{class:'mono'},x.code),h('td',null,x.name),h('td',{class:'num'},'ใหม่'),h('td',{class:'num'},n0(x.qty)+' '+x.unit))));
+    prev.replaceChildren(h('div',{style:'display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px'},chk('qty','อัปเดตยอดคงเหลือ'),chk('cost','อัปเดตต้นทุน'),chk('add','เพิ่มสินค้าที่ยังไม่มีในระบบ')),
+      h('div',{style:'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px'},tile('ยอดสต๊อกเปลี่ยน',P.upd.length,'var(--accent)'),tile('ต้นทุนเปลี่ยน',P.cost.length,'var(--accent)'),tile('สินค้าใหม่',P.add.length,'var(--good,#2e8b57)'),tile('เท่าเดิม',P.same),tile('ไม่อยู่ในไฟล์',P.miss)),
+      lst.length?h('div',{class:'tablewrap',style:'max-height:320px;overflow:auto'},h('table',null,h('tr',null,h('th',null,'รหัส'),h('th',null,'รายการ'),h('th',{class:'num'},'ส่วนที่เปลี่ยน'),h('th',{class:'num'},'ค่าเก่า → ใหม่')),lst)):h('div',{class:'hint'},'ไม่มีรายการที่ต้องอัปเดต — ข้อมูลตรงกับไฟล์แล้ว'),
+      (P.upd.length>150||P.cost.length>150||P.add.length>100)?h('div',{class:'hint'},'แสดงตัวอย่างบางส่วน — ตอนนำเข้าจะอัปเดตครบทุกรายการ'):null,
+      P.miss?h('div',{class:'hint'},'หมายเหตุ: สินค้า '+n0(P.miss)+' รายการในระบบไม่อยู่ในไฟล์นี้ — ไม่แตะต้อง'):null); }
+  box.append(h('div',{class:'hint'},'ส่งออกรายงานสินค้า/สินค้าคงเหลือจาก Express เป็น Excel หรือ CSV แล้วเลือกไฟล์ที่นี่ ระบบจับคู่ด้วยรหัสสินค้า แสดงตัวอย่างว่าจะเปลี่ยนอะไรบ้างก่อนบันทึก'),fi,ta,cols,prev);
+  openModal('อัปเดตสต๊อกจาก Express',box,[h('button',{class:'btn',onclick:closeModal},'ยกเลิก'),h('button',{class:'btn primary',onclick:async ev=>{
+    if(!det||!det.P){ toast('เลือกไฟล์ก่อน'); return; } const P=det.P; const n=P.upd.length+P.cost.length+P.add.length; if(!n){ toast('ไม่มีรายการที่ต้องอัปเดต'); return; }
+    if(!await ask('นำเข้าจาก '+srcName+'\n• ยอดสต๊อกเปลี่ยน '+n0(P.upd.length)+'\n• ต้นทุนเปลี่ยน '+n0(P.cost.length)+'\n• สินค้าใหม่ '+n0(P.add.length)+'\nยืนยัน?')) return;
+    const btn=ev.currentTarget; btn.disabled=true; const stamp=today(); const byIt=new Map(); let done=0, fail=0;
+    P.upd.forEach(x=>{ const o=byIt.get(x.it.id)||{it:x.it}; o.q=x; byIt.set(x.it.id,o); }); P.cost.forEach(x=>{ const o=byIt.get(x.it.id)||{it:x.it}; o.c=x; byIt.set(x.it.id,o); });
+    for(const o of byIt.values()){ btn.textContent='กำลังบันทึก '+(++done)+'/'+(byIt.size+P.add.length);
+      let rec={...strip(o.it)}; const logs=[];
+      if(o.q){ rec=stockMove(o.it,o.q.to-num(o.it.stock),null); rec.stock=o.q.to; rec.stockAsOf=stamp; logs.push('คงเหลือ '+n0(o.q.from)+' → '+n0(o.q.to)); }
+      if(o.c){ rec.cost=o.c.to; rec.costDate=stamp; logs.push('ต้นทุน '+n2(o.c.from)+' → '+n2(o.c.to)); }
+      rec.log=logAdd(o.it.log,'อัปเดตจาก Express ('+srcName+'): '+logs.join(' · ')); if(!(await put('items',o.it.id,rec))) fail++; }
+    for(const a of P.add){ btn.textContent='กำลังบันทึก '+(++done)+'/'+(byIt.size+P.add.length); if(!(await put('items',uid(),{code:a.code,name:a.name,unit:a.unit,cost:a.cost,stock:a.qty,min:0,suppliers:[],category:'',stockAsOf:stamp,log:logAdd([],'นำเข้าจาก Express ('+srcName+')')}))) fail++; }
+    try{ if(isAdmin()) await putSettings({...S.settings,expressImport:{ts:Date.now(),by:logBy(),file:srcName,upd:P.upd.length,cost:P.cost.length,add:P.add.length}}); }catch(e){}
+    closeModal(); toast('อัปเดตจาก Express แล้ว: สต๊อก '+n0(P.upd.length)+' · ต้นทุน '+n0(P.cost.length)+' · ใหม่ '+n0(P.add.length)+(fail?' (ไม่สำเร็จ '+fail+')':'')); render();
+  }},'นำเข้า / อัปเดต')]);
+}
+
 function stockImpPlan(){
   const R=window.STOCKIMP; if(!R) return null;
   const by=new Map(), byL=new Map();
