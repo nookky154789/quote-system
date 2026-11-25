@@ -2831,12 +2831,25 @@ function opsCard(){
   loadSnap();
   const lead=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px'});
   const drawLead=()=>{ if(!TEAM.length){ lead.replaceChildren(h('span',{class:'hint'},_teamLoaded?'ไม่พบรายชื่อผู้ใช้':'กำลังโหลดรายชื่อ…')); return; }
-    lead.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:leaderIds().includes(u.id),onchange:async e=>{ const cur=new Set(leaderIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,leaders:[...cur]})) toast('บันทึกหัวหน้าทีมแล้ว'); }}),u.name))); };
+    lead.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:leaderIds().includes(u.id),onchange:async e=>{ const cur=new Set(leaderIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,leaders:[...cur]})) { toast('บันทึกหัวหน้าทีมแล้ว'); if(typeof drawTm==='function') drawTm(); }; }}),u.name))); };
   const stk=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px'});
   const stkIds=()=>((S.settings||{}).stockUpdaters||[]).filter(Boolean);
   const drawStk=()=>{ if(!TEAM.length){ stk.replaceChildren(h('span',{class:'hint'},_teamLoaded?'ไม่พบรายชื่อผู้ใช้':'กำลังโหลดรายชื่อ…')); return; }
     stk.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:stkIds().includes(u.id),onchange:async e=>{ const cur=new Set(stkIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,stockUpdaters:[...cur]})) toast('บันทึกผู้อัปเดตสต๊อกแล้ว'); }}),u.name))); };
-  if(online){ drawLead(); drawStk(); if(!_teamLoaded||!TEAM.length) loadTeam().then(()=>{ drawLead(); drawStk(); }); }
+  const tm=h('div',{style:'display:flex;flex-direction:column;gap:6px;margin-top:4px'});
+  const lOf=()=>((S.settings||{}).leaderOf||{});
+  function drawTm(){ if(!TEAM.length){ tm.replaceChildren(h('span',{class:'hint'},'กำลังโหลดรายชื่อ…')); return; }
+    const L=TEAM.filter(u=>leaderIds().includes(u.id)), mem=TEAM.filter(u=>!leaderIds().includes(u.id));
+    if(!L.length){ tm.replaceChildren(h('span',{class:'hint'},'ติ๊กหัวหน้าทีมด้านบนก่อน แล้วจะเลือกลูกทีมของแต่ละคนได้ที่นี่')); return; }
+    tm.replaceChildren(...mem.map(u=>h('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'},h('span',{style:'min-width:130px'},u.name),
+      h('select',{style:'width:auto','aria-label':'หัวหน้าของ '+u.name,onchange:async e=>{ const m={...lOf()}; if(e.target.value) m[u.id]=e.target.value; else delete m[u.id]; if(await putSettings({...S.settings,leaderOf:m})) toast('บันทึกทีมแล้ว'); }},
+        h('option',{value:''},'— ไม่มีหัวหน้า —'),...L.map(l=>h('option',{value:l.id,selected:lOf()[u.id]===l.id},l.name)))))); }
+  const lsu=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px'});
+  const lsuIds=()=>((S.settings||{}).lowStockUsers||[]).filter(Boolean);
+  const drawLsu=()=>{ if(!TEAM.length){ lsu.replaceChildren(h('span',{class:'hint'},'กำลังโหลดรายชื่อ…')); return; }
+    lsu.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:lsuIds().includes(u.id),onchange:async e=>{ const cur=new Set(lsuIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,lowStockUsers:[...cur]})) toast('บันทึกผู้รับแจ้งของใกล้หมดแล้ว'); }}),u.name))); };
+  const dgOpt=(k,def,label)=>h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:((S.settings||{}).digest||{})[k]===undefined?def:!!((S.settings||{}).digest||{})[k],onchange:async e=>{ const d={...((S.settings||{}).digest||{}),[k]:e.target.checked}; if(await putSettings({...S.settings,digest:d})) toast('บันทึกแล้ว'); }}),label);
+  if(online){ drawLead(); drawStk(); drawTm(); drawLsu(); if(!_teamLoaded||!TEAM.length) loadTeam().then(()=>{ drawLead(); drawStk(); drawTm(); drawLsu(); }); }
   const lineRes=h('div',{class:'hint'});
   return h('div',{class:'card',style:'margin-bottom:14px'},h('b',null,'สำรองข้อมูล · Audit · แจ้งเตือน LINE (ผู้ดูแล)'),
     h('div',{class:'bar',style:'margin-top:8px'},
@@ -2848,6 +2861,9 @@ function opsCard(){
       h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:S.settings.lineOn!==false,onchange:async e=>{ if(await putSettings({...S.settings,lineOn:e.target.checked})) toast(e.target.checked?'เปิดแจ้งเตือน LINE':'ปิดแจ้งเตือน LINE'); }}),'แจ้งเตือน LINE รายคน เมื่อมอบหมายงานใหม่ / งานเสร็จ'),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'👑 หัวหน้าทีม'),h('div',{class:'hint'},'ได้รับแจ้งทาง LINE เมื่องานเสร็จ และเมื่อลูกทีมอัปเดต/ส่งงาน/ติ๊กงาน/ขอเบิกของ (ติ๊กได้หลายคน)'),lead),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'📦 ผู้มีสิทธิ์อัปเดตสต๊อกทาง LINE'),h('div',{class:'hint'},'ผู้ดูแลระบบ (admin) ทำได้เสมอ · ติ๊กเพิ่มเพื่อให้คนอื่นพิมพ์ "อัพเดทสต๊อก" แล้วส่งไฟล์ CSV จาก Express ได้ (ต้องผูก LINE แล้ว)'),stk),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'👥 ทีมของหัวหน้า'),h('div',{class:'hint'},'เลือกว่าแต่ละคนอยู่ทีมหัวหน้าคนไหน — หัวหน้าจะได้รับสรุปงานของทีมตัวเอง · admin ได้รับสรุปงานทั้งหมด'),tm),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'🗓 สรุปงานทาง LINE (ส่งอัตโนมัติ 08:00)'),dgOpt('daily',true,'สรุปงานประจำวัน (ทุกวัน)'),dgOpt('weekly',true,'สรุปงานประจำสัปดาห์ (ทุกวันจันทร์)'),dgOpt('self',false,'ส่งสรุปงานของตัวเองให้ลูกทีมแต่ละคนด้วย')),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'🔔 ผู้รับแจ้งเตือนของใกล้หมด (ทุกเช้า)'),h('div',{class:'hint'},'ติ๊กคนที่ต้องได้รับรายการของที่ต่ำกว่าจุดสั่งซื้อ · ถ้าไม่ติ๊กใครเลย จะส่งให้ admin'),lsu),
       h('div',{class:'hint',style:'margin:4px 0'},'ผู้ใช้แต่ละคนกด "🔔 ผูก LINE" ที่เมนูเพื่อผูกบัญชีของตัวเอง · ระบบส่งหาเฉพาะผู้ที่เกี่ยวข้อง'),
       h('button',{class:'btn small',onclick:async()=>{ lineRes.textContent='กำลังส่ง…'; const r=await linePush('🔔 ทดสอบแจ้งเตือนจากระบบประมาณราคา',true,[CU.id]); lineRes.textContent=r&&r.ok?'ส่งสำเร็จ':'ยังส่งไม่ได้: '+((r&&r.error)||'ไม่ทราบสาเหตุ'); }},'ส่งข้อความทดสอบ'),h('button',{class:'btn small',style:'margin-left:6px',onclick:async()=>{ lineRes.textContent='กำลังตั้งเมนู…'; try{ const {data,error}=await SB.functions.invoke('line-setup',{body:{}}); lineRes.textContent=error?('ไม่สำเร็จ: '+error.message):(data&&data.ok?'ตั้งเมนู LINE OA สำเร็จ (อาจใช้เวลาสักครู่กว่าจะขึ้นในแชท)':'ไม่สำเร็จ: '+((data&&data.error)||'')); }catch(e){ lineRes.textContent='ไม่สำเร็จ: '+(e.message||e); } }},'ตั้ง/อัปเดตเมนู LINE OA'),lineRes,lineList):null);
 }
