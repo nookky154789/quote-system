@@ -2472,6 +2472,7 @@ function withdrawModal(init){
     return !over.length;
   }
   function draw(){
+    d.lines.forEach(l=>{ l._redraw=draw; });
     const grpOf=l=>l.free?2:(num(l.qty)>stockOf(l.itemId)?1:0);
     const secs=[[0,'เบิกได้ (มีในสต็อก)','good'],[1,'ไม่มีในสต็อก / สต็อกไม่พอ (ไม่ตัดสต๊อก)','bad'],[2,'นอกฐานข้อมูลวัสดุ (ไม่ตัดสต๊อก)','mute']];
     const rows=[];
@@ -2492,6 +2493,7 @@ function withdrawModal(init){
   draw();
   const body=h('div',null,
     h('div',{class:'grid g4'},mk('no','เลขที่'),mk('date','วันที่','date'),mk('job','งาน / เครื่อง / ลูกค้า'),(()=>{ const f=mk('requester','ผู้เบิก (ผู้ที่ login อยู่)'); const i=f.querySelector('input'); if(CU){ i.readOnly=true; i.style.background='var(--bg)'; i.style.fontWeight='700'; } return f; })()),
+    h('div',{class:'field',style:'margin-top:8px;max-width:420px'},h('label',null,'เบิกจากคลัง (เลือกทั้งใบ)'),h('select',{'aria-label':'เบิกจากคลังทั้งใบ',onchange:e=>{ const k=e.target.value; d.lines.forEach(l=>{ const it=l.itemId&&!l.free?S.items.find(i=>i.id===l.itemId):null; if(!it) return; if(!k){ l.wh=''; return; } if(whAvail(it,k)>0) l.wh=k; }); draw(); if(k){ const miss=d.lines.filter(l=>{ const it=l.itemId&&!l.free?S.items.find(i=>i.id===l.itemId):null; return it&&whAvail(it,k)<=0; }).length; if(miss) toast(miss+' รายการไม่มีของในคลังนี้ — ใช้คลังอัตโนมัติ (เปลี่ยนรายบรรทัดได้)'); } }},h('option',{value:''},'— อัตโนมัติ (คลังที่มีของมากสุด) —'),...whCodes().map(k=>h('option',{value:k},whName(k))))),
     h('h2',{style:'margin-top:16px'},'รายการเบิก'),
     h('div',{class:'tablewrap'},h('table',null,h('thead',null,h('tr',null,h('th',null,'รหัสสินค้า'),h('th',null,'รายการ'),h('th',{class:'num'},'คงเหลือ'),h('th',null,'จำนวนเบิก'),h('th',null,''))),tb)),
     h('div',{class:'bar',style:'margin-top:8px'},h('div',{style:'min-width:260px'},h('button',{class:'btn',style:'margin-left:8px',onclick:async()=>{ const nm=await askName('ชื่อรายการที่ไม่อยู่ในฐานข้อมูล (ไม่ตัดสต๊อก)'); if(nm){ d.lines.push({itemId:'',free:true,code:'',name:nm,unit:'',qty:1,cost:0}); draw(); } }},'+ เพิ่มรายการนอกฐานข้อมูล'),h('button',{class:'btn',style:'margin-left:8px',onclick:()=>scanItem(it=>{ if(d.lines.some(l=>l.itemId===it.id)){toast('มีรายการนี้แล้ว');return;} d.lines.push({itemId:it.id,code:it.code||'',name:it.name,unit:it.unit,qty:1,cost:it.cost}); draw(); })},'📷 สแกน'),itemPicker(it=>{ if(d.lines.some(l=>l.itemId===it.id)){toast('มีรายการนี้แล้ว');return;} d.lines.push({itemId:it.id,code:it.code||'',name:it.name,unit:it.unit,qty:1,cost:it.cost}); draw(); },'เลือกวัสดุที่เบิก'))),
@@ -2533,7 +2535,7 @@ function whPickUi(l){
   const ls=whList(it); if(!ls.length) return null;
   if(!l.wh||!ls.some(w=>w.k===l.wh)) l.wh=whDefault(it,num(l.qty));
   return h('div',{style:'margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap'},h('span',{class:'hint'},'ตัดจากคลัง'),
-    h('select',{style:'width:auto;padding:2px 6px','aria-label':'เลือกคลังที่ตัดสต๊อก',onchange:e=>{ l.wh=e.target.value; }},...ls.map(w=>h('option',{value:w.k,selected:w.k===l.wh},whName(w.k)+' (เหลือ '+n0(w.q)+')'))));
+    h('select',{style:'width:auto;padding:2px 6px','aria-label':'เลือกคลังที่ตัดสต๊อก',onchange:e=>{ l.wh=e.target.value; if(typeof l._redraw==='function') l._redraw(); }},...ls.map(w=>h('option',{value:w.k,selected:w.k===l.wh},whName(w.k)+' (เหลือ '+n0(w.q)+')'))),num(l.qty)>whAvail(it,l.wh)?h('span',{class:'pill bad'},'คลังนี้มี '+n0(whAvail(it,l.wh))+' ไม่พอ — เลือกคลังอื่นหรือลดจำนวน'):null);
 }
 /* สร้าง record วัสดุใหม่หลังรับ/จ่าย โดยปรับทั้งยอดรวมและยอดรายคลัง */
 function stockMove(it,delta,wh,logText){
