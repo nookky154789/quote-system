@@ -1156,7 +1156,7 @@ function renderItemRows(){
         h('td',{class:'num'},n2(i.cost)),
         h('td',{class:'num'},mp?n2(mp):'-'),
         h('td',{class:'num'},n0(i.stock)+' '+(i.unit||''),whText(i)?h('div',{class:'hint',style:'white-space:normal'},whText(i)):null),
-        h('td',null,num(i.stock)<=0&&num(i.min)>0?h('span',{class:'pill bad'},'หมด'):low?h('span',{class:'pill warn'},'ใกล้หมด'):h('span',{class:'pill good'},'ปกติ')),
+        h('td',null,num(i.stock)<=0?h('span',{class:'pill bad'},'หมด'):low?h('span',{class:'pill warn'},'ใกล้หมด'):h('span',{class:'pill good'},'ปกติ')),
         h('td',{style:'white-space:nowrap'},modDate(i.modAt)),h('td',null,i.modBy||''),
         h('td',{class:'acts',style:'min-width:150px'},canEdit('items')?h('button',{class:'btn small',onclick:()=>receiveModal(i)},'รับเข้า'):null,' ',canEdit('items')?h('button',{class:'btn small',title:'ตั้งจำนวนขั้นต่ำ — แจ้งเตือน LINE ทันทีเมื่อต่ำกว่า',onclick:()=>itemMinModal(i)},(Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)?'⚠ ':'')+'ขั้นต่ำ'):null,' ',h('button',{class:'btn small',onclick:()=>itemModal(i)},'แก้ไข')));
     }),
