@@ -209,7 +209,7 @@ const num = v => { const x = parseFloat(String(v).replace(/,/g,'')); return isNa
 const today = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const thDate = s => { if(!s) return ''; const [y,m,d]=s.split('-'); return `${d}/${m}/${Number(y)+543}`; };
 const uid = () => Math.random().toString(36).slice(2,10);
-function toast(msg){ const t=h('div',{class:'toast',role:'status'},msg); document.body.append(t); setTimeout(()=>t.remove(),2600); }
+function toast(msg,ms){ const t=h('div',{class:'toast',role:'status'},msg); document.body.append(t); setTimeout(()=>t.remove(),ms||2600); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function bahtText(v){
@@ -955,13 +955,19 @@ function vLow(){
     const est=all.reduce((a,i)=>a+buyQty(i)*bestSup(i).price,0);
     const noMinZero=S.items.filter(i=>!(num(i.min)>0)&&num(i.stock)<=0).length;
     const fbtn=(k,t)=>h('button',{class:_lowF===k?'btn primary':'btn',onclick:()=>{_lowF=k;draw();}},t);
-    const send=async()=>{
-      if(!all.length){ toast('ไม่มีสินค้าที่ต่ำกว่าขั้นต่ำ'); return; }
-      const ids=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const to=ids.length?ids:(CU?[CU.id]:[]);
+    const doSend=async to=>{
+      if(!to.length){ toast('ยังไม่ได้เลือกผู้รับ'); return; }
       const sorted=[...all].sort((a,b)=>(num(a.stock)/num(a.min))-(num(b.stock)/num(b.min)));
       const rowsC=sorted.slice(0,40).map(i=>({n:i.name||'',c:i.code||'',v:[n0(i.stock),n0(i.min),n0(buyQty(i))+' '+(i.unit||'')],r:num(i.stock)<=0}));
       const r=await linePush('⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม '+all.length+' รายการ (หมด '+zero.length+')',true,to,{head:'⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม',color:'#c0392b',title:'ทั้งหมด '+all.length+' รายการ · หมดสต๊อก '+zero.length+' · ใกล้หมด '+(all.length-zero.length),cols:['สินค้า','เหลือ','ขั้นต่ำ','ซื้อเพิ่ม'],rows:rowsC,go:'lowstock',btn:'เปิดหน้ารายการในโปรแกรม'});
-      toast(r&&r.ok?'ส่ง LINE แล้ว ('+r.sent+' คน)':(r&&r.error==='recipients not linked'?'ผู้รับยังไม่ได้ผูก LINE':'ส่งไม่สำเร็จ: '+((r&&r.error)||'')));
+      toast(r&&r.ok?'ส่ง LINE แล้ว ('+r.sent+' คน'+(r.skipped?' · '+r.skipped+' คนยังไม่ผูก LINE':'')+')':(r&&r.error==='recipients not linked'?'ผู้รับที่เลือกยังไม่ได้ผูก LINE':'ส่งไม่สำเร็จ: '+((r&&r.error)||'ไม่ทราบสาเหตุ')),r&&r.ok?undefined:6000);
+    };
+    const send=async()=>{
+      if(!all.length){ toast('ไม่มีสินค้าที่ต่ำกว่าขั้นต่ำ'); return; }
+      if(!TEAM.length&&!_teamLoaded) await loadTeam();
+      const def=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const sel=new Set(def.length?def:(CU?[CU.id]:[]));
+      const box=h('div',{style:'display:flex;flex-direction:column;gap:8px;margin:8px 0'},...TEAM.map(u=>h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:sel.has(u.id),onchange:e=>{ if(e.target.checked) sel.add(u.id); else sel.delete(u.id); }}),u.name)));
+      openModal('ส่งสรุปของใกล้หมดเข้า LINE',h('div',null,h('div',{class:'hint'},'เลือกคนที่จะรับข้อความ (ต้องผูก LINE แล้วจึงจะได้รับ) · ค่าเริ่มต้นคือผู้รับแจ้งเตือนในหน้าตั้งค่า'),box),[h('button',{class:'btn',onclick:closeModal},'ยกเลิก'),h('button',{class:'btn primary',onclick:async()=>{ const to=[...sel]; closeModal(); await doSend(to); }},'📲 ส่ง')]);
     };
     const qi=h('input',{type:'search',placeholder:'ค้นหารหัส / ชื่อ',value:_lowQ,'aria-label':'ค้นหา',oninput:e=>{_lowQ=e.target.value;const pos=e.target.selectionStart;draw();const n=document.getElementById('lowq');if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}}},id:'lowq'});
     out.replaceChildren(
