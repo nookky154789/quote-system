@@ -2919,12 +2919,20 @@ function opsCard(){
   const posMap=()=>(S.settings||{}).positions||{'ฝ่ายจัดซื้อ':{buy:true}};
   const posOfMap=()=>(S.settings||{}).posOf||{};
   const savePos=(positions,posOf)=>putSettings({...S.settings,positions:positions||posMap(),posOf:posOf||posOfMap()});
-  const posBox=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0'});
+  const posBox=h('div',{style:'margin:8px 0 10px'});
   function drawPos(){ const pm=posMap();
-    posBox.replaceChildren(h('span',{class:'hint'},'ตำแหน่ง:'),...Object.entries(pm).map(([name,v])=>h('span',{class:'pill',style:'display:inline-flex;gap:6px;align-items:center;padding:3px 8px'},name,
-      h('label',{style:'display:inline-flex;gap:3px;align-items:center;font-size:11px;cursor:pointer'},h('input',{type:'checkbox',checked:!!(v&&v.buy),onchange:async e=>{ const m={...pm,[name]:{...v,buy:e.target.checked}}; if(await savePos(m)){ toast('บันทึกแล้ว'); drawPos(); } }}),'รับ PDF ขอซื้อ'),
-      h('button',{class:'btn small',style:'padding:0 6px',title:'ลบตำแหน่ง','aria-label':'ลบตำแหน่ง '+name,onclick:async()=>{ if(!await ask('ลบตำแหน่ง "'+name+'" ? (ผู้ที่อยู่ตำแหน่งนี้จะกลายเป็นไม่มีตำแหน่ง)')) return; const m={...pm}; delete m[name]; const po={...posOfMap()}; Object.keys(po).forEach(k=>{ if(po[k]===name) delete po[k]; }); if(await savePos(m,po)){ drawPos(); drawMx(); } }},'✕'))),
-      h('button',{class:'btn small',onclick:async()=>{ const nm=(await askName('ชื่อตำแหน่งใหม่ เช่น ฝ่ายจัดซื้อ / ฝ่ายคลัง'))||''; const t=nm.trim(); if(!t) return; if(pm[t]){ toast('มีตำแหน่งนี้แล้ว'); return; } if(await savePos({...pm,[t]:{buy:false}})){ drawPos(); drawMx(); } }},'+ เพิ่มตำแหน่ง')); }
+    posBox.replaceChildren(
+      h('div',{style:'font-weight:600;font-size:13px'},'ตำแหน่งงาน'),
+      h('div',{class:'hint',style:'margin-bottom:6px'},'สร้างตำแหน่ง แล้วเลือกให้พนักงานแต่ละคนในตารางด้านล่าง · ตำแหน่งที่เปิด "แจ้งเตือนเมื่อมีขอซื้อ" จะได้รับ LINE + ไฟล์ PDF เมื่อมีใบสั่งซื้อ/ใบเบิกที่ของไม่พอ'),
+      h('div',{style:'display:flex;flex-wrap:wrap;gap:8px;align-items:stretch'},
+      ...Object.entries(pm).map(([name,v])=>{ const on=!!(v&&v.buy); const cnt=Object.values(posOfMap()).filter(x=>x===name).length;
+        return h('div',{style:'border:1px solid var(--line,#d6dde3);border-radius:10px;padding:8px 10px;min-width:190px;display:flex;flex-direction:column;gap:6px'},
+          h('div',{style:'display:flex;justify-content:space-between;align-items:center;gap:8px'},h('b',null,name),
+            h('button',{class:'btn small',style:'padding:0 6px',title:'ลบตำแหน่ง','aria-label':'ลบตำแหน่ง '+name,onclick:async()=>{ if(!await ask('ลบตำแหน่ง "'+name+'" ? (ผู้ที่อยู่ตำแหน่งนี้จะกลายเป็นไม่ระบุ)')) return; const m={...pm}; delete m[name]; const po={...posOfMap()}; Object.keys(po).forEach(k=>{ if(po[k]===name) delete po[k]; }); if(await savePos(m,po)){ drawPos(); drawMx(); } }},'ลบ')),
+          h('div',{class:'hint'},cnt+' คน'),
+          h('button',{class:on?'btn primary small':'btn small',role:'switch','aria-checked':on?'true':'false',onclick:async()=>{ if(await savePos({...pm,[name]:{...v,buy:!on}})){ toast(!on?'เปิดแจ้งเตือนขอซื้อแล้ว':'ปิดแจ้งเตือนขอซื้อแล้ว'); drawPos(); } }},(on?'🔔 แจ้งเตือนเมื่อมีขอซื้อ: เปิด':'🔕 แจ้งเตือนเมื่อมีขอซื้อ: ปิด')));
+      }),
+      h('button',{class:'btn small',style:'align-self:center',onclick:async()=>{ const nm=(await askName('ชื่อตำแหน่งใหม่ เช่น ฝ่ายจัดซื้อ / ฝ่ายคลัง'))||''; const t=nm.trim(); if(!t) return; if(pm[t]){ toast('มีตำแหน่งนี้แล้ว'); return; } if(await savePos({...pm,[t]:{buy:false}})){ drawPos(); drawMx(); } }},'+ เพิ่มตำแหน่ง'))); }
   drawPos();
   async function drawMx(force){ if(!online) return;
     mx.replaceChildren(h('div',{class:'hint',style:'padding:8px'},'กำลังโหลดรายชื่อ…'));
