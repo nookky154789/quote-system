@@ -883,14 +883,16 @@ function itemMinModal(it){
   if(!canEdit('items')) return;
   const rc=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const nameOf=id=>((TEAM||[]).find(u=>u.id===id)||{}).name||'?';
   const inp=h('input',{type:'number',min:'0',step:'any',value:it.min||'',id:'imin',style:'max-width:200px'});
+  const inpBuy=h('input',{type:'number',min:'0',step:'any',value:num(it.buyQty)>0?it.buyQty:'',id:'ibuy',style:'max-width:200px'});
 
   const la=it.lowAlert, acks=la&&la.acks?Object.keys(la.acks):[];
   const lowNow=Number(it.min)>0&&(Number(it.stock)||0)<=Number(it.min);
-  const save=async()=>{ const v=Math.max(0,num(inp.value)); if(!await put('items',it.id,strip({...it,min:v}))) return; it.min=v; closeModal(); toast(v>0?('ตั้งขั้นต่ำ '+n0(v)+' '+(it.unit||'')+' แล้ว'+((Number(it.stock)||0)<=v?' — ต่ำกว่าขั้นต่ำ ระบบแจ้ง LINE ทันที':'')):'ยกเลิกขั้นต่ำแล้ว'); render(); };
+  const save=async()=>{ const v=Math.max(0,num(inp.value)); const bq=Math.max(0,num(inpBuy.value)); const nr=strip({...it,min:v,buyQty:bq>0?bq:undefined}); if(bq<=0) delete nr.buyQty; if(!await put('items',it.id,nr)) return; it.min=v; if(bq>0) it.buyQty=bq; else delete it.buyQty; closeModal(); toast(v>0?('ตั้งขั้นต่ำ '+n0(v)+' '+(it.unit||'')+' แล้ว'+((Number(it.stock)||0)<=v?' — ต่ำกว่าขั้นต่ำ ระบบแจ้ง LINE ทันที':'')):'ยกเลิกขั้นต่ำแล้ว'); render(); };
   openModal('ตั้งจำนวนขั้นต่ำ',h('div',null,
     h('div',{style:'font-weight:700'},it.name||''),h('div',{class:'mono hint'},it.code||''),
     h('p',null,'คงเหลือตอนนี้: ',h('b',{style:lowNow?'color:#c0392b':''},n0(it.stock)+' '+(it.unit||''))),
     h('div',{class:'field'},h('label',{for:'imin'},'จำนวนขั้นต่ำ (จุดสั่งซื้อ)'),inp),
+    h('div',{class:'field'},h('label',{for:'ibuy'},'จำนวนที่ควรซื้อเพิ่ม (เว้นว่าง = อัตโนมัติ ให้ถึง 2 เท่าของขั้นต่ำ)'),inpBuy),
     h('p',{class:'hint'},'เมื่อคงเหลือเท่ากับหรือต่ำกว่าค่านี้ ระบบส่ง LINE แจ้งทันที พร้อมปุ่ม "รับทราบ" — ถ้าผู้รับไม่กดรับทราบ จะเตือนซ้ำทุกเช้า 08:00 จนกว่าจะกดหรือมีของเข้า · ผู้รับ: '+(rc.length?rc.map(nameOf).join(', '):'แอดมิน (ยังไม่ได้เลือกใน ตั้งค่า > แจ้งของใกล้หมด)')),
     lowNow?h('p',{class:'hint'},la&&la.at?('แจ้งครั้งล่าสุด '+logTs(la.at)+' · รับทราบแล้ว: '+(acks.length?acks.map(nameOf).join(', '):'ยังไม่มี')):'อยู่ในสถานะต่ำกว่าขั้นต่ำ'):null),
     [h('button',{class:'btn',onclick:closeModal},'ยกเลิก'),h('button',{class:'btn primary',onclick:save},'บันทึก')]);
@@ -941,7 +943,7 @@ async function minStockModal(){
 let _lowF='all', _lowQ='';
 function vLow(){
   const ed=canEdit('items');
-  const buyQty=i=>Math.max(1,num(i.min)*2-num(i.stock));
+  const buyQty=buyQtyOf;
   const base=()=>S.items.filter(i=>num(i.min)>0&&num(i.stock)<=num(i.min));
   const out=h('div',null);
   const draw=()=>{
@@ -970,7 +972,7 @@ function vLow(){
       noMinZero?h('p',{class:'hint'},'มีสินค้า '+noMinZero+' รายการที่คงเหลือ 0 แต่ยังไม่ได้ตั้งขั้นต่ำ จึงไม่อยู่ในหน้านี้ — ตั้งขั้นต่ำที่ปุ่ม "ขั้นต่ำ" ในหน้าวัสดุ / สินค้า'):null,
       rows.length?h('div',{class:'tablewrap'},h('table',null,h('thead',null,h('tr',null,h('th',null,'รหัส'),h('th',null,'ชื่อ'),h('th',{class:'num'},'คงเหลือ'),h('th',{class:'num'},'ขั้นต่ำ'),h('th',{class:'num'},'ควรซื้อเพิ่ม'),h('th',null,'ร้านราคาต่ำสุด'),h('th',{class:'num'},'ราคา/หน่วย'),h('th',{class:'num'},'ประมาณ (บาท)'),h('th',null,'สถานะ'),ed?h('th',null,''):null)),
         h('tbody',null,...rows.map(i=>{ const b=bestSup(i), z=num(i.stock)<=0, bq=buyQty(i);
-          return h('tr',null,h('td',{class:'mono'},i.code||''),h('td',null,i.name||''),h('td',{class:'num',style:z?'color:#c0392b;font-weight:700':''},n0(i.stock)+' '+(i.unit||'')),h('td',{class:'num'},n0(i.min)),h('td',{class:'num'},h('b',null,n0(bq)),' '+(i.unit||'')),h('td',null,b.name===NO_SUP?'-':b.name),h('td',{class:'num'},b.price?n2(b.price):'-'),h('td',{class:'num'},b.price?n2(bq*b.price):'-'),
+          return h('tr',null,h('td',{class:'mono'},i.code||''),h('td',null,i.name||''),h('td',{class:'num',style:z?'color:#c0392b;font-weight:700':''},n0(i.stock)+' '+(i.unit||'')),h('td',{class:'num'},n0(i.min)),h('td',{class:'num'},ed?h('input',{type:'number',min:'0',step:'any',value:num(i.buyQty)>0?i.buyQty:'',placeholder:n0(bq),title:'จำนวนที่ต้องการซื้อเพิ่ม (เว้นว่าง = อัตโนมัติ ให้ถึง 2 เท่าของขั้นต่ำ)','aria-label':'จำนวนซื้อเพิ่ม '+(i.code||''),style:'width:80px;text-align:right',onchange:async e=>{ const v=Math.max(0,num(e.target.value)); const rec=strip({...i,buyQty:v>0?v:undefined}); if(v<=0) delete rec.buyQty; if(await put('items',i.id,rec)){ if(v>0) i.buyQty=v; else delete i.buyQty; toast(v>0?'ตั้งจำนวนซื้อเพิ่ม '+n0(v)+' แล้ว':'ใช้ค่าอัตโนมัติ'); draw(); } else e.target.value=num(i.buyQty)>0?i.buyQty:''; }}):h('b',null,n0(bq)),' '+(i.unit||'')),h('td',null,b.name===NO_SUP?'-':b.name),h('td',{class:'num'},b.price?n2(b.price):'-'),h('td',{class:'num'},b.price?n2(bq*b.price):'-'),
             h('td',null,z?h('span',{class:'pill bad'},'หมด'):h('span',{class:'pill warn'},'ใกล้หมด')),
             ed?h('td',{class:'acts'},h('button',{class:'btn small',onclick:()=>itemMinModal(i)},'ขั้นต่ำ')):null); })))):h('div',{class:'empty'},all.length?'ไม่พบรายการ':'🎉 ไม่มีสินค้าที่ต่ำกว่าขั้นต่ำ'));
     mobilize(out);
@@ -2743,11 +2745,12 @@ async function poCreate(lines,job,note){
   }
   return made;
 }
+const buyQtyOf=i=>num(i.buyQty)>0?num(i.buyQty):Math.max(1,num(i.min)*2-num(i.stock));
 async function poFromLow(){
   const low=S.items.filter(i=>num(i.min)>0&&num(i.stock)<=num(i.min));
   if(!low.length){ toast('ไม่มีของใกล้หมด'); return; }
   if(!await ask('สร้างใบสั่งซื้อจากของใกล้หมด '+low.length+' รายการ? (แยกตามร้านที่ราคาต่ำสุด สั่งให้ถึง 2 เท่าของจุดสั่งซื้อ)')) return;
-  const made=await poCreate(low.map(i=>({itemId:i.id,qty:Math.max(1,num(i.min)*2-num(i.stock))})),'','สร้างจากของใกล้หมด');
+  const made=await poCreate(low.map(i=>({itemId:i.id,qty:buyQtyOf(i)})),'','สร้างจากของใกล้หมด');
   toast('สร้างใบสั่งซื้อ '+made.length+' ใบ'); view='po'; render();
 }
 let poF='open';
