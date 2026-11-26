@@ -858,6 +858,48 @@ function itemSortFn(k){
     cost_d:(a,b)=>num(b.cost)-num(a.cost),cost_a:(a,b)=>num(a.cost)-num(b.cost),stock_d:(a,b)=>num(b.stock)-num(a.stock),stock_a:(a,b)=>num(a.stock)-num(b.stock),
     low:(a,b)=>((num(a.min)>0?num(a.stock)/num(a.min):1e9)-(num(b.min)>0?num(b.stock)/num(b.min):1e9))}[k]||(()=>0);
 }
+function lowItems(){ return S.items.filter(i=>Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)).sort((a,b)=>((Number(a.stock)||0)/Number(a.min))-((Number(b.stock)||0)/Number(b.min))); }
+let _msQ='', _msF='set';
+async function minStockModal(){
+  if(!canEdit('items')) return;
+  if(typeof SB!=='undefined'&&SB&&!_teamLoaded) await loadTeam();
+  const rcpIds=()=>((S.settings||{}).lowStockUsers||[]).filter(Boolean);
+  const nameOf=id=>((TEAM||[]).find(u=>u.id===id)||{}).name||'?';
+  const info=h('div',{class:'hint',style:'margin:4px 0'});
+  const drawInfo=()=>{ const r=rcpIds(); info.textContent='ผู้รับแจ้งเตือน LINE: '+(r.length?r.map(nameOf).join(', '):'ยังไม่ได้เลือก (ตอนนี้ระบบอัตโนมัติส่งหาแอดมิน)')+' · เลือกได้ที่ ตั้งค่า > ตารางสิทธิ์ > คอลัมน์ "แจ้งของใกล้หมด" · ระบบส่งสรุปอัตโนมัติทุกเช้า 08:00 เมื่อมีของต่ำกว่าขั้นต่ำ'; };
+  drawInfo();
+  const q=h('input',{type:'search',placeholder:'ค้นหารหัส / ชื่อ','aria-label':'ค้นหา',value:_msQ,oninput:e=>{ _msQ=e.target.value; draw(); }});
+  const cnt=h('span',{class:'hint'});
+  const list=h('div',{class:'tablewrap',style:'max-height:46vh;overflow:auto'});
+  const fb=h('div',{class:'bar'});
+  function draw(){
+    const set=S.items.filter(i=>Number(i.min)>0), low=lowItems();
+    fb.replaceChildren(...[['set','ตั้งขั้นต่ำแล้ว ('+set.length+')'],['low','ต่ำกว่าขั้นต่ำ ('+low.length+')'],['all','ทุกรายการ ('+S.items.length+')']].map(([k,t])=>h('button',{class:'btn small'+(_msF===k?' primary':''),onclick:()=>{ _msF=k; draw(); }},t)));
+    const qq=_msQ.trim().toLowerCase();
+    let rows=_msF==='low'?low:_msF==='set'?set:S.items;
+    if(qq) rows=rows.filter(i=>String(i.code||'').toLowerCase().includes(qq)||String(i.name||'').toLowerCase().includes(qq));
+    if(_msF==='all'&&!qq) rows=rows.slice(0,0);
+    const shown=rows.slice(0,100);
+    cnt.textContent=(_msF==='all'&&!qq)?'พิมพ์ค้นหาเพื่อเลือกสินค้าที่จะตั้งขั้นต่ำ':'แสดง '+shown.length+(rows.length>shown.length?' จาก '+rows.length:'')+' รายการ';
+    list.replaceChildren(shown.length?h('table',null,h('thead',null,h('tr',null,h('th',null,'รหัส / ชื่อ'),h('th',{class:'num'},'คงเหลือ'),h('th',{class:'num'},'ขั้นต่ำ (จุดสั่งซื้อ)'))),h('tbody',null,...shown.map(it=>{
+      const lowNow=Number(it.min)>0&&(Number(it.stock)||0)<=Number(it.min);
+      const inp=h('input',{type:'number',min:'0',step:'any',value:it.min||'',style:'width:90px;text-align:right','aria-label':'ขั้นต่ำของ '+(it.code||it.name),
+        onchange:async e=>{ const v=Math.max(0,num(e.target.value)); const rec=strip({...it,min:v}); if(await put('items',it.id,rec)){ it.min=v; toast(v>0?'ตั้งขั้นต่ำ '+n0(v)+' แล้ว':'ยกเลิกขั้นต่ำแล้ว'); draw(); } else e.target.value=it.min||''; }});
+      return h('tr',null,h('td',null,h('div',{class:'mono'},it.code||''),h('div',null,it.name||'')),h('td',{class:'num',style:lowNow?'color:#c0392b;font-weight:700':''},n0(it.stock)+' '+(it.unit||'')),h('td',{class:'num'},inp));
+    }))):h('div',{class:'empty'},_msF==='set'?'ยังไม่ได้ตั้งขั้นต่ำให้สินค้าใด — กด "ทุกรายการ" แล้วค้นหาสินค้าเพื่อตั้งค่า':'ไม่พบรายการ'));
+  }
+  draw();
+  const sendNow=async()=>{
+    const low=lowItems(); if(!low.length){ toast('ยังไม่มีสินค้าที่ต่ำกว่าขั้นต่ำ'); return; }
+    const to=rcpIds().length?rcpIds():(CU?[CU.id]:[]);
+    const lines=low.slice(0,25).map(i=>'• '+(i.code||'')+' '+(i.name||'')+' — เหลือ '+n0(i.stock)+' / ขั้นต่ำ '+n0(i.min)+' '+(i.unit||''));
+    const r=await linePush('🔔 สินค้าต่ำกว่าขั้นต่ำ '+low.length+' รายการ\n'+lines.join('\n')+(low.length>25?'\n…และอีก '+(low.length-25)+' รายการ':''),true,to,{head:'🔔 สินค้าต่ำกว่าขั้นต่ำ '+low.length+' รายการ',color:'#b7791f',title:'ต่ำกว่าหรือเท่าจุดสั่งซื้อ',lines,go:'items',btn:'เปิดสต๊อกในโปรแกรม'});
+    toast(r&&r.ok?'ส่งแจ้งเตือน LINE แล้ว ('+r.sent+' คน)':(r&&r.error==='recipients not linked'?'ผู้รับยังไม่ได้ผูก LINE':'ส่งไม่สำเร็จ: '+((r&&r.error)||'')));
+  };
+  openModal('🔔 สินค้าขั้นต่ำ / แจ้งเตือน',h('div',null,h('p',{class:'hint'},'ตั้ง "ขั้นต่ำ" ให้สินค้าที่ต้องเฝ้าดู เมื่อคงเหลือเท่ากับหรือต่ำกว่าค่านี้ ระบบจะแจ้งคนที่กำหนดทาง LINE'),info,q,fb,cnt,list),[
+    h('button',{class:'btn',onclick:closeModal},'ปิด'),
+    h('button',{class:'btn primary',onclick:sendNow},'📲 ส่งแจ้งเตือนเดี๋ยวนี้')]);
+}
 function vItems(){
   if(!_limInit){ _limInit=true; itemLimit=prefs().itemLimit; }
   const el=h('div',null,h('h1',null,'วัสดุ / สินค้า'),h('p',{class:'sub'},'ฐานข้อมูลกลางที่ใช้ทั้งการประมาณราคา ใบเสนอราคา และการเบิกของ'));
@@ -881,6 +923,7 @@ function vItems(){
     h('select',{style:'width:auto;max-width:260px','aria-label':'กรองหมวด',onchange:e=>{itemCat=e.target.value;renderItemRows();}},...catOpts()),
     h('select',{style:'width:auto','aria-label':'จำนวนที่แสดง',onchange:e=>{itemLimit=+e.target.value;renderItemRows();}},...[[0,'แสดงทั้งหมด'],[200,'แสดง 200'],[500,'แสดง 500'],[1000,'แสดง 1,000']].map(([k,t])=>h('option',{value:k,selected:k===itemLimit},t))),
     canEdit('items')?h('button',{class:'btn primary',onclick:()=>itemModal()},'เพิ่มวัสดุ'):null,
+    canEdit('items')?h('button',{class:'btn',title:'ตั้งจุดสั่งซื้อ (ขั้นต่ำ) ของแต่ละสินค้า แล้วให้ LINE แจ้งคนที่กำหนดเมื่อของต่ำกว่าขั้นต่ำ',onclick:minStockModal},'🔔 สินค้าขั้นต่ำ / แจ้งเตือน'):null,
     canEdit('items')?h('button',{class:'btn primary',title:'อัปโหลดไฟล์ Excel/CSV ที่ส่งออกจาก Express — ระบบเทียบกับของเดิมและอัปเดตให้',onclick:expImportModal},'⬆ อัปเดตสต๊อกจาก Express'):null,
     canEdit('items')?h('button',{class:'btn',onclick:importModal},'นำเข้าจากตาราง'):null,
     (S.settings&&S.settings.expressImport)?h('span',{class:'hint',title:'จาก '+S.settings.expressImport.file},'อัปเดตจาก Express ล่าสุด '+logTs(S.settings.expressImport.ts)+' · สต๊อก '+n0(S.settings.expressImport.upd)+' · ต้นทุน '+n0(S.settings.expressImport.cost)+' · ใหม่ '+n0(S.settings.expressImport.add)):null,
