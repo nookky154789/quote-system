@@ -956,8 +956,9 @@ function vLow(){
     const send=async()=>{
       if(!all.length){ toast('ไม่มีสินค้าที่ต่ำกว่าขั้นต่ำ'); return; }
       const ids=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const to=ids.length?ids:(CU?[CU.id]:[]);
-      const lines=[...all].sort((a,b)=>(num(a.stock)/num(a.min))-(num(b.stock)/num(b.min))).slice(0,25).map(i=>'• '+(i.code||'')+' '+(i.name||'')+' — เหลือ '+n0(i.stock)+' / ขั้นต่ำ '+n0(i.min)+' → ซื้อเพิ่ม '+n0(buyQty(i))+' '+(i.unit||''));
-      const r=await linePush('⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม '+all.length+' รายการ (หมด '+zero.length+')\n'+lines.join('\n')+(all.length>25?'\n…และอีก '+(all.length-25)+' รายการ':''),true,to);
+      const sorted=[...all].sort((a,b)=>(num(a.stock)/num(a.min))-(num(b.stock)/num(b.min)));
+      const rowsC=sorted.slice(0,40).map(i=>({n:i.name||'',c:i.code||'',v:[n0(i.stock),n0(i.min),n0(buyQty(i))+' '+(i.unit||'')],r:num(i.stock)<=0}));
+      const r=await linePush('⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม '+all.length+' รายการ (หมด '+zero.length+')',true,to,{head:'⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม',color:'#c0392b',title:'ทั้งหมด '+all.length+' รายการ · หมดสต๊อก '+zero.length+' · ใกล้หมด '+(all.length-zero.length),cols:['สินค้า','เหลือ','ขั้นต่ำ','ซื้อเพิ่ม'],rows:rowsC,go:'lowstock',btn:'เปิดหน้ารายการในโปรแกรม'});
       toast(r&&r.ok?'ส่ง LINE แล้ว ('+r.sent+' คน)':(r&&r.error==='recipients not linked'?'ผู้รับยังไม่ได้ผูก LINE':'ส่งไม่สำเร็จ: '+((r&&r.error)||'')));
     };
     const qi=h('input',{type:'search',placeholder:'ค้นหารหัส / ชื่อ',value:_lowQ,'aria-label':'ค้นหา',oninput:e=>{_lowQ=e.target.value;const pos=e.target.selectionStart;draw();const n=document.getElementById('lowq');if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}}},id:'lowq'});
