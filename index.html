@@ -882,11 +882,6 @@ function itemMinModal(it){
   if(!canEdit('items')) return;
   const rc=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const nameOf=id=>((TEAM||[]).find(u=>u.id===id)||{}).name||'?';
   const inp=h('input',{type:'number',min:'0',step:'any',value:it.min||'',id:'imin',style:'max-width:200px'});
-  const rcBox=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:4px'});
-  const rcIds=()=>((S.settings||{}).lowStockUsers||[]).filter(Boolean);
-  const drawRc=()=>{ if(!(TEAM||[]).length){ rcBox.replaceChildren(h('span',{class:'hint'},'กำลังโหลดรายชื่อ…')); return; }
-    rcBox.replaceChildren(...TEAM.map(u=>h('label',{style:'display:flex;gap:6px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:rcIds().includes(u.id),onchange:async e=>{ const cur=new Set(rcIds()); if(e.target.checked) cur.add(u.id); else cur.delete(u.id); if(await putSettings({...S.settings,lowStockUsers:[...cur]})) toast('บันทึกผู้รับแจ้งแล้ว'); }}),u.name))); };
-  drawRc(); if(typeof loadTeam==='function'&&(!_teamLoaded||!(TEAM||[]).length)) loadTeam().then(drawRc);
 
   const la=it.lowAlert, acks=la&&la.acks?Object.keys(la.acks):[];
   const lowNow=Number(it.min)>0&&(Number(it.stock)||0)<=Number(it.min);
@@ -896,7 +891,6 @@ function itemMinModal(it){
     h('p',null,'คงเหลือตอนนี้: ',h('b',{style:lowNow?'color:#c0392b':''},n0(it.stock)+' '+(it.unit||''))),
     h('div',{class:'field'},h('label',{for:'imin'},'จำนวนขั้นต่ำ (จุดสั่งซื้อ)'),inp),
     h('p',{class:'hint'},'เมื่อคงเหลือเท่ากับหรือต่ำกว่าค่านี้ ระบบส่ง LINE แจ้งทันที พร้อมปุ่ม "รับทราบ" — ถ้าผู้รับไม่กดรับทราบ จะเตือนซ้ำทุกเช้า 08:00 จนกว่าจะกดหรือมีของเข้า · ผู้รับ: '+(rc.length?rc.map(nameOf).join(', '):'แอดมิน (ยังไม่ได้เลือกใน ตั้งค่า > แจ้งของใกล้หมด)')),
-    h('div',{class:'field'},h('label',null,'ผู้รับแจ้งเตือนสินค้าใกล้หมด (ใช้ร่วมกับทุกรายการ)'),rcBox,h('div',{class:'hint'},'ไม่ติ๊กใคร = ส่งให้แอดมิน · ต้องผูก LINE แล้วจึงจะได้รับ')),
     lowNow?h('p',{class:'hint'},la&&la.at?('แจ้งครั้งล่าสุด '+logTs(la.at)+' · รับทราบแล้ว: '+(acks.length?acks.map(nameOf).join(', '):'ยังไม่มี')):'อยู่ในสถานะต่ำกว่าขั้นต่ำ'):null),
     [h('button',{class:'btn',onclick:closeModal},'ยกเลิก'),h('button',{class:'btn primary',onclick:save},'บันทึก')]);
   setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(e){} },50);
@@ -3059,6 +3053,7 @@ function opsCard(){
       h('div',{style:'margin:10px 0 6px'},h('b',null,'👥 สิทธิ์และการแจ้งเตือนรายคน'),h('div',{class:'hint'},'หนึ่งแถวต่อหนึ่งคน · เปลี่ยนแล้วบันทึกทันที · คนที่ยังไม่ผูก LINE จะตั้งสิทธิ์ที่ต้องใช้ LINE ไม่ได้ (ให้เขากด "🔔 ผูก LINE" ในแอปก่อน) · เพิ่มผู้ใช้ใหม่แล้วกด "รีเฟรชรายชื่อ"'),h('button',{class:'btn small',style:'margin:4px 0',onclick:()=>drawMx(true)},'รีเฟรชรายชื่อ'),posBox,mx),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'🗓 สรุปงานทาง LINE (ส่งอัตโนมัติ 08:00)'),dgOpt('daily',true,'สรุปงานประจำวัน (ทุกวัน)'),dgOpt('weekly',true,'สรุปงานประจำสัปดาห์ (ทุกวันจันทร์)'),dgOpt('self',false,'ส่งสรุปงานของตัวเองให้ลูกทีมแต่ละคนด้วย')),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'✅ ผู้อนุมัติใบเบิก / ใบสั่งซื้อ (ทาง LINE)'),h('div',{class:'hint'},'ผู้อนุมัติเลือกในตารางด้านบน (admin อนุมัติได้เสมอ) — คนขอกด "ส่งขออนุมัติ" แล้วผู้อนุมัติจะได้การ์ดใน LINE พร้อมปุ่ม อนุมัติ / ไม่อนุมัติ · ใบเบิกที่สร้างจาก LINE ส่งขออนุมัติให้อัตโนมัติ'),arOpt('po','บังคับต้องอนุมัติก่อนเปลี่ยนสถานะใบสั่งซื้อเป็น "สั่งซื้อแล้ว"'),arOpt('wd','บังคับต้องอนุมัติก่อนยืนยันเบิก (ใบเบิกที่สร้างจาก LINE)')),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'📦 ผู้รับแจ้งเตือนสินค้าใกล้หมด (LINE)'),h('div',{class:'hint'},'ติ๊กคนที่จะได้รับข้อความเมื่อสินค้าต่ำกว่าขั้นต่ำ (ตั้งขั้นต่ำที่ปุ่ม "ขั้นต่ำ" ในหน้าสินค้า) · ไม่ติ๊กใคร = ส่งให้แอดมิน · ต้องผูก LINE แล้ว'),lsu),
       h('div',{class:'hint',style:'margin:4px 0'},'ผู้ใช้แต่ละคนกด "🔔 ผูก LINE" ที่เมนูเพื่อผูกบัญชีของตัวเอง · ระบบส่งหาเฉพาะผู้ที่เกี่ยวข้อง'),
       h('button',{class:'btn small',onclick:async()=>{ lineRes.textContent='กำลังส่ง…'; const r=await linePush('🔔 ทดสอบแจ้งเตือนจากระบบประมาณราคา',true,[CU.id]); lineRes.textContent=r&&r.ok?'ส่งสำเร็จ':'ยังส่งไม่ได้: '+((r&&r.error)||'ไม่ทราบสาเหตุ'); }},'ส่งข้อความทดสอบ'),h('button',{class:'btn small',style:'margin-left:6px',onclick:async()=>{ lineRes.textContent='กำลังตั้งเมนู…'; try{ const {data,error}=await SB.functions.invoke('line-setup',{body:{}}); lineRes.textContent=error?('ไม่สำเร็จ: '+error.message):(data&&data.ok?'ตั้งเมนู LINE OA สำเร็จ (อาจใช้เวลาสักครู่กว่าจะขึ้นในแชท)':'ไม่สำเร็จ: '+((data&&data.error)||'')); }catch(e){ lineRes.textContent='ไม่สำเร็จ: '+(e.message||e); } }},'ตั้ง/อัปเดตเมนู LINE OA'),lineRes,lineList):null);
 }
