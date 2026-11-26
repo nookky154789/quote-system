@@ -959,7 +959,6 @@ function vItems(){
     h('select',{style:'width:auto;max-width:260px','aria-label':'กรองหมวด',onchange:e=>{itemCat=e.target.value;renderItemRows();}},...catOpts()),
     h('select',{style:'width:auto','aria-label':'จำนวนที่แสดง',onchange:e=>{itemLimit=+e.target.value;renderItemRows();}},...[[0,'แสดงทั้งหมด'],[200,'แสดง 200'],[500,'แสดง 500'],[1000,'แสดง 1,000']].map(([k,t])=>h('option',{value:k,selected:k===itemLimit},t))),
     canEdit('items')?h('button',{class:'btn primary',onclick:()=>itemModal()},'เพิ่มวัสดุ'):null,
-    canEdit('items')?h('button',{class:'btn',title:'ตั้งจุดสั่งซื้อ (ขั้นต่ำ) ของแต่ละสินค้า แล้วให้ LINE แจ้งคนที่กำหนดเมื่อของต่ำกว่าขั้นต่ำ',onclick:minStockModal},'🔔 สินค้าขั้นต่ำ / แจ้งเตือน'):null,
     canEdit('items')?h('button',{class:'btn primary',title:'อัปโหลดไฟล์ Excel/CSV ที่ส่งออกจาก Express — ระบบเทียบกับของเดิมและอัปเดตให้',onclick:expImportModal},'⬆ อัปเดตสต๊อกจาก Express'):null,
     canEdit('items')?h('button',{class:'btn',onclick:importModal},'นำเข้าจากตาราง'):null,
     (S.settings&&S.settings.expressImport)?h('span',{class:'hint',title:'จาก '+S.settings.expressImport.file},'อัปเดตจาก Express ล่าสุด '+logTs(S.settings.expressImport.ts)+' · สต๊อก '+n0(S.settings.expressImport.upd)+' · ต้นทุน '+n0(S.settings.expressImport.cost)+' · ใหม่ '+n0(S.settings.expressImport.add)):null,
