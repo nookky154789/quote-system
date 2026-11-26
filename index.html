@@ -421,6 +421,7 @@ const LEVELS_BY={ja:[['none','ไม่เห็นเมนูนี้'],['vie
 const levelsFor=k=>LEVELS_BY[k]||LEVELS;
 let CU=null;
 function lvl(mod){
+  if(mod==='lowstock') mod='items';
   if(!CU) return 0; if(mod==='monitor') return 1; if(mod==='reports') return hasAll()?1:0; if(mod==='audit') return CU.role==='admin'?1:0; if(CU.role==='admin') return 2; if(CU.role==='editor') return mod==='settings'?1:2; if(CU.role==='viewer') return mod==='settings'?0:1;
   return {none:0,view:1,edit:2}[(CU.perms||{})[mod]||'none']||0;
 }
@@ -690,9 +691,9 @@ function whModal(){
 const stockOf = id => num((S.items.find(i=>i.id===id)||{}).stock);
 
 /* ---------- nav ---------- */
-const TABS=[['home','ภาพรวม'],['monitor','มอบหมายงานของฉัน'],['items','วัสดุ / สินค้า'],['estimates','ประมาณราคา'],['ja','มอบหมายงาน'],['jobs','งานที่เคยทำ'],['boms','BOM เครื่องจักร'],['quotes','ใบเสนอราคา'],['withdrawals','เบิกของ'],['po','ใบสั่งซื้อ'],['count','ตรวจนับสต๊อก'],['reports','รายงาน'],['audit','ประวัติการแก้ไข'],['settings','ตั้งค่า'],['users','ผู้ใช้งาน']];
-const TAB_ICON={monitor:'📈',ja:'📋',home:'🏠',items:'📦',estimates:'🧮',jobs:'🗂️',boms:'🛠️',quotes:'📄',withdrawals:'📤',po:'🛒',count:'🧾',reports:'📊',audit:'🕵️',settings:'⚙️',users:'👥'};
-const TAB_SHORT={monitor:'งานของฉัน',ja:'มอบหมาย',home:'ภาพรวม',items:'วัสดุ',estimates:'ประมาณราคา',jobs:'งานเก่า',boms:'BOM',quotes:'ใบเสนอ',withdrawals:'เบิกของ',po:'สั่งซื้อ',count:'ตรวจนับ',reports:'รายงาน',audit:'Audit',settings:'ตั้งค่า',users:'ผู้ใช้'};
+const TABS=[['home','ภาพรวม'],['monitor','มอบหมายงานของฉัน'],['items','วัสดุ / สินค้า'],['lowstock','ของใกล้หมด / ต้องซื้อเพิ่ม'],['estimates','ประมาณราคา'],['ja','มอบหมายงาน'],['jobs','งานที่เคยทำ'],['boms','BOM เครื่องจักร'],['quotes','ใบเสนอราคา'],['withdrawals','เบิกของ'],['po','ใบสั่งซื้อ'],['count','ตรวจนับสต๊อก'],['reports','รายงาน'],['audit','ประวัติการแก้ไข'],['settings','ตั้งค่า'],['users','ผู้ใช้งาน']];
+const TAB_ICON={lowstock:'⚠️',monitor:'📈',ja:'📋',home:'🏠',items:'📦',estimates:'🧮',jobs:'🗂️',boms:'🛠️',quotes:'📄',withdrawals:'📤',po:'🛒',count:'🧾',reports:'📊',audit:'🕵️',settings:'⚙️',users:'👥'};
+const TAB_SHORT={lowstock:'ใกล้หมด',monitor:'งานของฉัน',ja:'มอบหมาย',home:'ภาพรวม',items:'วัสดุ',estimates:'ประมาณราคา',jobs:'งานเก่า',boms:'BOM',quotes:'ใบเสนอ',withdrawals:'เบิกของ',po:'สั่งซื้อ',count:'ตรวจนับ',reports:'รายงาน',audit:'Audit',settings:'ตั้งค่า',users:'ผู้ใช้'};
 function mobilize(root){
   root.querySelectorAll('.tablewrap table').forEach(t=>{
     if(t.closest('.sheet')) return;
@@ -751,7 +752,7 @@ function render(){
   if(view==='home'&&!canHome()) view=homeFb();
   else if(view!=='home'&&!(view==='users'?isAdmin():canView(view))) view=homeFb();
   if(view!=='users'&&!menuOn(view)){ const fv=TABS.find(([k])=>k!=='users'&&menuOn(k)&&(k==='home'?canHome():canView(k))); view=fv?fv[0]:homeFb(); }
-  const fn={monitor:()=>jaBanner(vMonitor()),ja:()=>jaBanner(vJa()),home:()=>jaBanner(vHome()),items:vItems,jobs:vJobs,boms:vBoms,estimates:vEstimates,quotes:vQuotes,withdrawals:vWithdrawals,po:vPo,count:vCount,reports:vReports,audit:vAudit,settings:vSettings,users:vUsers}[view];
+  const fn={monitor:()=>jaBanner(vMonitor()),ja:()=>jaBanner(vJa()),home:()=>jaBanner(vHome()),items:vItems,jobs:vJobs,boms:vBoms,estimates:vEstimates,quotes:vQuotes,withdrawals:vWithdrawals,po:vPo,lowstock:vLow,count:vCount,reports:vReports,audit:vAudit,settings:vSettings,users:vUsers}[view];
   const frag=h('div');
   if(dbDown && !window.IS_DESKTOP) frag.append(h('div',{class:'card',style:'margin-bottom:14px;border-color:var(--warn)'},'ฐานข้อมูลใช้ไม่ได้ในมุมมองนี้ ข้อมูลเก็บเฉพาะในเบราว์เซอร์เครื่องนี้ และอาจหายได้ ควรเปิดจากหน้า claude.ai ที่ลงชื่อเข้าใช้แล้ว'));
   frag.append(fn());
@@ -770,7 +771,7 @@ function vHome(){
   el.append(h('div',{class:'tiles'},
     tile(S.items.length,'รายการวัสดุ'),
     tile(n2(stockVal),'มูลค่าสต๊อก (บาท)'),
-    tile(low.length,'ใกล้หมด / หมด',low.length?'bad':null),
+    (()=>{ const t=tile(low.length,'ใกล้หมด / หมด (กดดูรายการ)',low.length?'bad':null); t.style.cursor='pointer'; t.onclick=()=>{ view='lowstock'; render(); }; return t; })(),
     tile(open.length+' ใบ',`ใบเสนอราคาที่รอผล ${n2(openVal)} บาท`),
     tile(n2(won),'ปิดการขายแล้ว (บาท, รวม VAT)')
   ));
@@ -936,6 +937,45 @@ async function minStockModal(){
   openModal('🔔 สินค้าขั้นต่ำ / แจ้งเตือน',h('div',null,h('p',{class:'hint'},'ตั้ง "ขั้นต่ำ" ให้สินค้าที่ต้องเฝ้าดู เมื่อคงเหลือเท่ากับหรือต่ำกว่าค่านี้ ระบบจะแจ้งคนที่กำหนดทาง LINE'),info,q,fb,cnt,list),[
     h('button',{class:'btn',onclick:closeModal},'ปิด'),
     h('button',{class:'btn primary',onclick:sendNow},'📲 ส่งแจ้งเตือนเดี๋ยวนี้')]);
+}
+let _lowF='all', _lowQ='';
+function vLow(){
+  const ed=canEdit('items');
+  const buyQty=i=>Math.max(1,num(i.min)*2-num(i.stock));
+  const base=()=>S.items.filter(i=>num(i.min)>0&&num(i.stock)<=num(i.min));
+  const out=h('div',null);
+  const draw=()=>{
+    const all=base(), zero=all.filter(i=>num(i.stock)<=0), near=all.filter(i=>num(i.stock)>0);
+    const q=_lowQ.trim().toLowerCase();
+    let rows=_lowF==='zero'?zero:_lowF==='near'?near:all;
+    if(q) rows=rows.filter(i=>((i.code||'')+' '+(i.name||'')+' '+(i.category||'')).toLowerCase().includes(q));
+    rows=[...rows].sort((a,b)=>(num(a.stock)/num(a.min))-(num(b.stock)/num(b.min)));
+    const est=all.reduce((a,i)=>a+buyQty(i)*bestSup(i).price,0);
+    const noMinZero=S.items.filter(i=>!(num(i.min)>0)&&num(i.stock)<=0).length;
+    const fbtn=(k,t)=>h('button',{class:_lowF===k?'btn primary':'btn',onclick:()=>{_lowF=k;draw();}},t);
+    const send=async()=>{
+      if(!all.length){ toast('ไม่มีสินค้าที่ต่ำกว่าขั้นต่ำ'); return; }
+      const ids=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const to=ids.length?ids:(CU?[CU.id]:[]);
+      const lines=[...all].sort((a,b)=>(num(a.stock)/num(a.min))-(num(b.stock)/num(b.min))).slice(0,25).map(i=>'• '+(i.code||'')+' '+(i.name||'')+' — เหลือ '+n0(i.stock)+' / ขั้นต่ำ '+n0(i.min)+' → ซื้อเพิ่ม '+n0(buyQty(i))+' '+(i.unit||''));
+      const r=await linePush('⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม '+all.length+' รายการ (หมด '+zero.length+')\n'+lines.join('\n')+(all.length>25?'\n…และอีก '+(all.length-25)+' รายการ':''),true,to);
+      toast(r&&r.ok?'ส่ง LINE แล้ว ('+r.sent+' คน)':(r&&r.error==='recipients not linked'?'ผู้รับยังไม่ได้ผูก LINE':'ส่งไม่สำเร็จ: '+((r&&r.error)||'')));
+    };
+    const qi=h('input',{type:'search',placeholder:'ค้นหารหัส / ชื่อ',value:_lowQ,'aria-label':'ค้นหา',oninput:e=>{_lowQ=e.target.value;const pos=e.target.selectionStart;draw();const n=document.getElementById('lowq');if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}}},id:'lowq'});
+    out.replaceChildren(
+      h('div',{class:'tiles'},tile(all.length,'ต่ำกว่าขั้นต่ำทั้งหมด',all.length?'bad':null),tile(zero.length,'หมดสต๊อก (0)',zero.length?'bad':null),tile(near.length,'ใกล้หมด'),tile(n2(est),'งบซื้อโดยประมาณ (บาท)')),
+      h('div',{class:'bar'},fbtn('all','ทั้งหมด ('+all.length+')'),fbtn('zero','หมด ('+zero.length+')'),fbtn('near','ใกล้หมด ('+near.length+')'),qi,
+        ed&&all.length?h('button',{class:'btn primary',onclick:poFromLow},'🛒 สร้างใบสั่งซื้อจากรายการนี้ ('+all.length+')'):null,
+        all.length?h('button',{class:'btn',onclick:send},'📲 ส่งสรุปเข้า LINE'):null),
+      noMinZero?h('p',{class:'hint'},'มีสินค้า '+noMinZero+' รายการที่คงเหลือ 0 แต่ยังไม่ได้ตั้งขั้นต่ำ จึงไม่อยู่ในหน้านี้ — ตั้งขั้นต่ำที่ปุ่ม "ขั้นต่ำ" ในหน้าวัสดุ / สินค้า'):null,
+      rows.length?h('div',{class:'tablewrap'},h('table',null,h('thead',null,h('tr',null,h('th',null,'รหัส'),h('th',null,'ชื่อ'),h('th',{class:'num'},'คงเหลือ'),h('th',{class:'num'},'ขั้นต่ำ'),h('th',{class:'num'},'ควรซื้อเพิ่ม'),h('th',null,'ร้านราคาต่ำสุด'),h('th',{class:'num'},'ราคา/หน่วย'),h('th',{class:'num'},'ประมาณ (บาท)'),h('th',null,'สถานะ'),ed?h('th',null,''):null)),
+        h('tbody',null,...rows.map(i=>{ const b=bestSup(i), z=num(i.stock)<=0, bq=buyQty(i);
+          return h('tr',null,h('td',{class:'mono'},i.code||''),h('td',null,i.name||''),h('td',{class:'num',style:z?'color:#c0392b;font-weight:700':''},n0(i.stock)+' '+(i.unit||'')),h('td',{class:'num'},n0(i.min)),h('td',{class:'num'},h('b',null,n0(bq))+' '+(i.unit||'')),h('td',null,b.name===NO_SUP?'-':b.name),h('td',{class:'num'},b.price?n2(b.price):'-'),h('td',{class:'num'},b.price?n2(bq*b.price):'-'),
+            h('td',null,z?h('span',{class:'pill bad'},'หมด'):h('span',{class:'pill warn'},'ใกล้หมด')),
+            ed?h('td',{class:'acts'},h('button',{class:'btn small',onclick:()=>itemMinModal(i)},'ขั้นต่ำ')):null); })))):h('div',{class:'empty'},all.length?'ไม่พบรายการ':'🎉 ไม่มีสินค้าที่ต่ำกว่าขั้นต่ำ'));
+    mobilize(out);
+  };
+  draw();
+  return h('div',null,h('h1',null,'ของใกล้หมด / ต้องซื้อเพิ่ม'),h('p',{class:'sub'},'สินค้าที่คงเหลือเท่ากับหรือต่ำกว่าขั้นต่ำ · ควรซื้อเพิ่ม = ให้ถึง 2 เท่าของขั้นต่ำ (ตรงกับการสร้างใบสั่งซื้ออัตโนมัติ)'),out);
 }
 function vItems(){
   if(!_limInit){ _limInit=true; itemLimit=prefs().itemLimit; }
