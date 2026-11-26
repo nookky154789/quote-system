@@ -2520,6 +2520,7 @@ function withdrawModal(init){
         return {jk:l.jk,cat:catOf(l)||undefined,itemId:l.itemId,free:l.free?1:undefined,nostock:ns?1:undefined,remark:ns?(l.free?'ไม่มีในสต็อก (ไม่อยู่ในฐานข้อมูล)':(have>0?'ไม่มีในสต็อก (คงเหลือ '+n0(have)+')':'ไม่มีในสต็อก')):undefined,code:l.code||'',name:l.name,unit:l.unit,qty:num(l.qty),cost:l.cost,wh:(ns?undefined:(l.wh||undefined))}; })};
       const wid=init.reqId||uid();
       if(!(await put('withdrawals',wid,rec))){ btn.disabled=false; return; }
+      if((rec.lines||[]).some(l=>l.nostock)) purchNotify('wd',wid);
       for(const l of rec.lines){
         const it=S.items.find(i=>i.id===l.itemId);
         if(it&&!l.nostock){ await put('items',it.id,stockMove(it,-l.qty,l.wh)); }
@@ -2585,6 +2586,8 @@ async function apprDecide(kind,col,rec,ok){
 function apprBtns(kind,col,rec,after){
   if(!(rec.appr&&rec.appr.st==='pending'&&apprIsApprover())) return [];
   return [h('button',{class:'btn small primary',style:'margin-right:6px',onclick:async()=>{ if(await apprDecide(kind,col,rec,true)&&after) after(); }},'อนุมัติ'),h('button',{class:'btn small danger',style:'margin-right:6px',onclick:async()=>{ if(await apprDecide(kind,col,rec,false)&&after) after(); }},'ไม่อนุมัติ')]; }
+async function purchNotify(kind,id,force){
+  try{ if(typeof SB==='undefined'||!SB) return null; const {data,error}=await SB.functions.invoke('purchase-notify',{body:{kind,id,force:!!force}}); return error?{ok:false,error:error.message}:data; }catch(e){ return {ok:false,error:String(e&&e.message||e)}; } }
 function jaBriefLines(a){ const L=[]; if(a.customer) L.push('ลูกค้า: '+a.customer); if(a.start||a.end) L.push('กำหนด: '+(a.end?thDate(a.end):'ไม่ระบุ')+(a.start?' (เริ่ม '+thDate(a.start)+')':'')); const as=(a.assignees||[]).map(x=>x.name).join(', '); if(as) L.push('ผู้รับผิดชอบ: '+as); if(a.createdBy) L.push('ผู้สั่งงาน: '+a.createdBy); if(a.detail) L.push('รายละเอียด: '+String(a.detail).slice(0,600)); if(a.note) L.push('Remark งานที่ได้รับมอบหมาย: '+String(a.note).slice(0,300)); const T=a.tasks||[]; if(T.length){ L.push('งานที่ต้องทำ '+T.filter(t=>t.done).length+'/'+T.length+':'); T.slice(0,15).forEach(t=>L.push((t.done?'✅ ':'⬜ ')+t.text+(t.who?' ('+t.who.name+')':''))); } const M=a.lines||[]; if(M.length){ L.push('วัสดุที่ต้องเบิก '+M.length+' รายการ:'); M.slice(0,25).forEach(l=>L.push('• '+(l.name||'')+' ×'+n0(l.qty)+' '+(l.unit||''))); if(M.length>25) L.push('…และอีก '+(M.length-25)+' รายการ'); } const F=a.files||[]; if(F.length) L.push('แบบแนบ: ไฟฟ้า '+F.filter(f=>f.kind==='elec').length+' · เครื่องกล '+F.filter(f=>f.kind==='mech').length+' ไฟล์'); return L; }
 async function lineModal(){
   const box=h('div',null,h('div',{class:'hint'},'กำลังโหลด…'));
@@ -2614,7 +2617,7 @@ async function poCreate(lines,job,note){
   for(const [sup,ls] of g){
     const no=await freshNo(pre,all,nextNo(pre,all));
     const rec={no,date:today(),supplier:sup===NO_SUP?'':sup,status:'draft',lines:ls,job:job||'',note:note||'',by:logBy()}; const id=uid();
-    if(await put('po',id,rec)){ all.push({...rec,id}); made.push({...rec,id}); }
+    if(await put('po',id,rec)){ all.push({...rec,id}); made.push({...rec,id}); purchNotify('po',id); }
   }
   return made;
 }
@@ -2694,6 +2697,7 @@ function poModal(src){
   const foot=[];
   if(!isNew&&canEdit('po')) foot.push(h('button',{class:'btn danger',onclick:async()=>{ if(!await ask('ลบใบสั่งซื้อ '+d.no+' ?')) return; if(await del('po',d.id)){ closeModal(); toast('ลบแล้ว'); } }},'ลบ'));
   foot.push(h('button',{class:'btn',onclick:closeModal},'ปิด'));
+  if(!isNew&&canEdit('po')) foot.push(h('button',{class:'btn',onclick:async()=>{ const r=await purchNotify('po',d.id,true); toast(r&&r.ok?(r.n?'ส่ง PDF ให้ฝ่ายจัดซื้อแล้ว ('+r.n+' คน)':'ยังไม่มีผู้รับ — ตั้งตำแหน่ง "ฝ่ายจัดซื้อ" และผูก LINE ในหน้าตั้งค่า'):'ส่งไม่สำเร็จ'); }},'ส่ง PDF ให้ฝ่ายจัดซื้อ (LINE)'));
   if(!isNew&&canEdit('po')&&['draft','sent','partial'].includes(d.status)) foot.push(h('button',{class:'btn primary',onclick:()=>{ closeModal(); poReceive(S.po.find(x=>x.id===d.id)||d); }},'รับของเข้าสต๊อก'));
   async function saveDoc(forceSplit){
     if(!d.lines.length){ toast('เพิ่มรายการก่อน'); return; }
@@ -2707,14 +2711,15 @@ function poModal(src){
     if(!split){
       const r=strip(d); r.lines=mk(d.lines); if(prev&&prev.appr) r.appr=prev.appr; else delete r.appr; if(g.size===1){ const k=[...g.keys()][0]; if(k) r.supplier=k; }
       if(r.status==='draft'&&r.lines.every(l=>num(l.recv)>=num(l.qty))) r.status='received';
-      if(await put('po',d.id,r)){ closeModal(); toast('บันทึกใบสั่งซื้อแล้ว'); } return; }
+      if(prev&&prev.pnAt) r.pnAt=prev.pnAt;
+      if(await put('po',d.id,r)){ closeModal(); toast('บันทึกใบสั่งซื้อแล้ว'); if(isNew) purchNotify('po',d.id); } return; }
     const keys=[...g.keys()]; const first=keys.includes((d.supplier||'').trim())?(d.supplier||'').trim():keys[0]; const order=[first,...keys.filter(k=>k!==first)];
     const all=[...S.po]; const made=[];
     for(let n=0;n<order.length;n++){ const k=order[n]; const ls=mk(g.get(k)).map(l=>({...l,sup:k}));
       const base=strip(d); let id=d.id, no=d.no;
       if(n>0){ id=uid(); no=await freshNo(pre,all,nextNo(pre,all)); }
       const rec={...base,no,supplier:k,lines:ls,status:n===0?d.status:'draft'}; if(n>0||!(prev&&prev.appr)) delete rec.appr; else rec.appr=prev.appr;
-      if(await put('po',id,rec)){ all.push({...rec,id}); made.push(no); } }
+      if(await put('po',id,rec)){ all.push({...rec,id}); made.push(no); if(n>0||isNew) purchNotify('po',id); } }
     closeModal(); toast('แยกเป็น '+made.length+' ใบ: '+made.join(', ')); }
   if(ed) foot.push(h('button',{class:'btn primary',onclick:()=>saveDoc(false)},'บันทึก'));
   openModal((isNew?'ใบสั่งซื้อใหม่':'ใบสั่งซื้อ '+d.no),body,foot); modalExport(()=>tPo(d));
@@ -2911,6 +2916,16 @@ function opsCard(){
   let mxLinks=new Map();
   const setIds=(key,id,on)=>{ const cur=new Set(((S.settings||{})[key]||[]).filter(Boolean)); if(on) cur.add(id); else cur.delete(id); return putSettings({...S.settings,[key]:[...cur]}); };
   const idsOf=k=>((S.settings||{})[k]||[]).filter(Boolean);
+  const posMap=()=>(S.settings||{}).positions||{'ฝ่ายจัดซื้อ':{buy:true}};
+  const posOfMap=()=>(S.settings||{}).posOf||{};
+  const savePos=(positions,posOf)=>putSettings({...S.settings,positions:positions||posMap(),posOf:posOf||posOfMap()});
+  const posBox=h('div',{style:'display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0'});
+  function drawPos(){ const pm=posMap();
+    posBox.replaceChildren(h('span',{class:'hint'},'ตำแหน่ง:'),...Object.entries(pm).map(([name,v])=>h('span',{class:'pill',style:'display:inline-flex;gap:6px;align-items:center;padding:3px 8px'},name,
+      h('label',{style:'display:inline-flex;gap:3px;align-items:center;font-size:11px;cursor:pointer'},h('input',{type:'checkbox',checked:!!(v&&v.buy),onchange:async e=>{ const m={...pm,[name]:{...v,buy:e.target.checked}}; if(await savePos(m)){ toast('บันทึกแล้ว'); drawPos(); } }}),'รับ PDF ขอซื้อ'),
+      h('button',{class:'btn small',style:'padding:0 6px',title:'ลบตำแหน่ง','aria-label':'ลบตำแหน่ง '+name,onclick:async()=>{ if(!await ask('ลบตำแหน่ง "'+name+'" ? (ผู้ที่อยู่ตำแหน่งนี้จะกลายเป็นไม่มีตำแหน่ง)')) return; const m={...pm}; delete m[name]; const po={...posOfMap()}; Object.keys(po).forEach(k=>{ if(po[k]===name) delete po[k]; }); if(await savePos(m,po)){ drawPos(); drawMx(); } }},'✕'))),
+      h('button',{class:'btn small',onclick:async()=>{ const nm=(await askName('ชื่อตำแหน่งใหม่ เช่น ฝ่ายจัดซื้อ / ฝ่ายคลัง'))||''; const t=nm.trim(); if(!t) return; if(pm[t]){ toast('มีตำแหน่งนี้แล้ว'); return; } if(await savePos({...pm,[t]:{buy:false}})){ drawPos(); drawMx(); } }},'+ เพิ่มตำแหน่ง')); }
+  drawPos();
   async function drawMx(force){ if(!online) return;
     mx.replaceChildren(h('div',{class:'hint',style:'padding:8px'},'กำลังโหลดรายชื่อ…'));
     if(force||!TEAM.length||!_teamLoaded) await loadTeam();
@@ -2927,6 +2942,7 @@ function opsCard(){
       const feat=LFEAT.map(([k,t])=>td(adm?h('span',{class:'hint'},'✓'):cb(!offOf(u.id).includes(k),async on=>{ const m={...((S.settings||{}).lineOff||{})}; const cur=new Set(offOf(u.id)); if(on) cur.delete(k); else cur.add(k); m[u.id]=[...cur]; if(await putSettings({...S.settings,lineOff:m})) toast('บันทึกแล้ว'); },noL,t)));
       return h('tr',null,h('td',{style:'white-space:nowrap;font-weight:600'},u.name),
         td(adm?h('span',{class:'pill good'},'แอดมิน'):lk?h('span',{class:'pill good'},'ผูกแล้ว'):h('span',{class:'pill mute'},'ยังไม่ผูก')),
+        td(h('select',{style:'width:auto;padding:2px 6px','aria-label':'ตำแหน่งของ '+u.name,onchange:async e=>{ const po={...posOfMap()}; if(e.target.value) po[u.id]=e.target.value; else delete po[u.id]; if(await savePos(null,po)) toast('บันทึกตำแหน่งแล้ว'); }},h('option',{value:''},'— ไม่ระบุ —'),...Object.keys(posMap()).map(n=>h('option',{value:n,selected:posOfMap()[u.id]===n},n)))),
         td(srch),
         td(cb(idsOf('leaders').includes(u.id),async on=>{ if(await setIds('leaders',u.id,on)){ toast('บันทึกหัวหน้าทีมแล้ว'); drawMx(); } })),
         td(team),
@@ -2934,7 +2950,7 @@ function opsCard(){
         td(adm?h('span',{class:'hint'},'✓'):cb(idsOf('approvers').includes(u.id),async on=>{ if(await setIds('approvers',u.id,on)) toast('บันทึกผู้อนุมัติแล้ว'); },noL)),
         td(cb(idsOf('lowStockUsers').includes(u.id),async on=>{ if(await setIds('lowStockUsers',u.id,on)) toast('บันทึกแล้ว'); },noL)),
         ...feat); });
-    mx.replaceChildren(h('table',null,h('thead',null,h('tr',null,th('ผู้ใช้'),th('LINE'),th('ค้นหาสินค้า'),th('หัวหน้าทีม'),th('อยู่ทีมของ'),th('อัพเดทสต๊อก'),th('อนุมัติ'),th('แจ้งของใกล้หมด'),...LFEAT.map(([k,t])=>th(t)))),h('tbody',null,...rows))); }
+    mx.replaceChildren(h('table',null,h('thead',null,h('tr',null,th('ผู้ใช้'),th('LINE'),th('ตำแหน่ง'),th('ค้นหาสินค้า'),th('หัวหน้าทีม'),th('อยู่ทีมของ'),th('อัพเดทสต๊อก'),th('อนุมัติ'),th('แจ้งของใกล้หมด'),...LFEAT.map(([k,t])=>th(t)))),h('tbody',null,...rows))); }
   drawMx(true);
   const lineRes=h('div',{class:'hint'});
   return h('div',{class:'card',style:'margin-bottom:14px'},h('b',null,'สำรองข้อมูล · Audit · แจ้งเตือน LINE (ผู้ดูแล)'),
@@ -2945,7 +2961,7 @@ function opsCard(){
     h('div',{style:'margin-top:8px'},snapBox),
     online?h('div',{style:'margin-top:12px;border-top:1px solid var(--line);padding-top:10px'},
       h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:S.settings.lineOn!==false,onchange:async e=>{ if(await putSettings({...S.settings,lineOn:e.target.checked})) toast(e.target.checked?'เปิดแจ้งเตือน LINE':'ปิดแจ้งเตือน LINE'); }}),'แจ้งเตือน LINE รายคน เมื่อมอบหมายงานใหม่ / งานเสร็จ'),
-      h('div',{style:'margin:10px 0 6px'},h('b',null,'👥 สิทธิ์และการแจ้งเตือนรายคน'),h('div',{class:'hint'},'หนึ่งแถวต่อหนึ่งคน · เปลี่ยนแล้วบันทึกทันที · คนที่ยังไม่ผูก LINE จะตั้งสิทธิ์ที่ต้องใช้ LINE ไม่ได้ (ให้เขากด "🔔 ผูก LINE" ในแอปก่อน) · เพิ่มผู้ใช้ใหม่แล้วกด "รีเฟรชรายชื่อ"'),h('button',{class:'btn small',style:'margin:4px 0',onclick:()=>drawMx(true)},'รีเฟรชรายชื่อ'),mx),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'👥 สิทธิ์และการแจ้งเตือนรายคน'),h('div',{class:'hint'},'หนึ่งแถวต่อหนึ่งคน · เปลี่ยนแล้วบันทึกทันที · คนที่ยังไม่ผูก LINE จะตั้งสิทธิ์ที่ต้องใช้ LINE ไม่ได้ (ให้เขากด "🔔 ผูก LINE" ในแอปก่อน) · เพิ่มผู้ใช้ใหม่แล้วกด "รีเฟรชรายชื่อ"'),h('button',{class:'btn small',style:'margin:4px 0',onclick:()=>drawMx(true)},'รีเฟรชรายชื่อ'),posBox,mx),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'🗓 สรุปงานทาง LINE (ส่งอัตโนมัติ 08:00)'),dgOpt('daily',true,'สรุปงานประจำวัน (ทุกวัน)'),dgOpt('weekly',true,'สรุปงานประจำสัปดาห์ (ทุกวันจันทร์)'),dgOpt('self',false,'ส่งสรุปงานของตัวเองให้ลูกทีมแต่ละคนด้วย')),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'✅ ผู้อนุมัติใบเบิก / ใบสั่งซื้อ (ทาง LINE)'),h('div',{class:'hint'},'ผู้อนุมัติเลือกในตารางด้านบน (admin อนุมัติได้เสมอ) — คนขอกด "ส่งขออนุมัติ" แล้วผู้อนุมัติจะได้การ์ดใน LINE พร้อมปุ่ม อนุมัติ / ไม่อนุมัติ · ใบเบิกที่สร้างจาก LINE ส่งขออนุมัติให้อัตโนมัติ'),arOpt('po','บังคับต้องอนุมัติก่อนเปลี่ยนสถานะใบสั่งซื้อเป็น "สั่งซื้อแล้ว"'),arOpt('wd','บังคับต้องอนุมัติก่อนยืนยันเบิก (ใบเบิกที่สร้างจาก LINE)')),
       h('div',{class:'hint',style:'margin:4px 0'},'ผู้ใช้แต่ละคนกด "🔔 ผูก LINE" ที่เมนูเพื่อผูกบัญชีของตัวเอง · ระบบส่งหาเฉพาะผู้ที่เกี่ยวข้อง'),
