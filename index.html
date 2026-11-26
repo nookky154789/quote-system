@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>try{var _t=localStorage.getItem('uiTheme');if(_t&&_t!=='auto')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
 <style>
 /* Layout: left rail navigation + work area; dense tables, engineering-drawing feel */
 :root{
@@ -25,6 +26,12 @@
   --bg:#12181e; --panel:#1b232b; --ink:#e6ecf1; --muted:#93a1ae; --line:#2e3944;
   --accent:#4fb4cf; --accent-ink:#0b1a20; --accent-soft:#18323b;
   --good:#52c58a; --warn:#e5a63c; --bad:#f08077; --warn-soft:#3a2d12; --bad-soft:#40201d; --good-soft:#173324; color-scheme:dark;}
+
+:root[data-theme="nature"]{--bg:#eef4ea;--panel:#fbfdf9;--ink:#1d2b1e;--muted:#5d7260;--line:#cfdcc9;--accent:#2e7d32;--accent-ink:#fff;--accent-soft:#dcecd7;--good:#2e7d32;--warn:#a8680a;--bad:#b3261e;--warn-soft:#fbefd0;--bad-soft:#f8e2df;--good-soft:#d9efd9;--rail:#e3eedd;color-scheme:light}
+:root[data-theme="sea"]{--bg:#ecf5f9;--panel:#fcfeff;--ink:#0f2f3b;--muted:#4f7080;--line:#c8e0ea;--accent:#0a7ea4;--accent-ink:#fff;--accent-soft:#d6eef7;--good:#12805c;--warn:#b26a00;--bad:#b3261e;--warn-soft:#fff1d6;--bad-soft:#fbe4e2;--good-soft:#d8f2ea;--rail:#dcedf4;color-scheme:light}
+:root[data-theme="mountain"]{--bg:#eceef2;--panel:#fcfcfd;--ink:#1c2330;--muted:#5b6574;--line:#d3d8e0;--accent:#46597f;--accent-ink:#fff;--accent-soft:#e1e6f1;--good:#2f7a52;--warn:#a8680a;--bad:#b3261e;--warn-soft:#f8ecd4;--bad-soft:#f7e3e1;--good-soft:#dcefe4;--rail:#e2e6ee;color-scheme:light}
+nav.rail{background:var(--rail,var(--panel))}
+td.acts .btn{margin:2px 2px 2px 0}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font);}
@@ -698,11 +705,23 @@ function mobilize(root){
 function mobileMenu(){
   const body=h('div',{style:'display:grid;gap:10px'},
     h('div',{class:'card'},h('b',null,CU?(CU.name||CU.username):''),h('div',{class:'hint'},CU?roleLabel(CU):'')),
+    h('button',{class:'btn',onclick:()=>{closeModal();themeModal();}},'🎨 เลือกธีม'),
     isAdmin()?h('button',{class:'btn',onclick:()=>{closeModal();prefModal();}},'🎛 ตั้งค่าการแสดงผล'):null,
     (typeof SB!=='undefined'&&SB)?h('button',{class:'btn',onclick:()=>{closeModal();lineModal();}},'🔔 ผูก LINE'):null,
     h('button',{class:'btn',onclick:()=>{closeModal();changeMyPw();}},'🔑 เปลี่ยนรหัสผ่าน'),
     h('button',{class:'btn danger',onclick:()=>{closeModal();logout();}},'ออกจากระบบ'));
   openModal('บัญชีผู้ใช้',body,[h('button',{class:'btn',onclick:closeModal},'ปิด')]);
+}
+const THEMES=[['auto','อัตโนมัติ (ตามเครื่อง)','⚙️','#f3f5f7','#0b6e8a'],['light','สว่างมาตรฐาน','☀️','#f3f5f7','#0b6e8a'],['dark','มืด','🌙','#12181e','#4fb4cf'],['nature','ธรรมชาติ','🌿','#eef4ea','#2e7d32'],['sea','ทะเล','🌊','#ecf5f9','#0a7ea4'],['mountain','ภูเขา','⛰️','#eceef2','#46597f']];
+function setTheme(t){ try{ localStorage.setItem('uiTheme',t); }catch(e){} if(!t||t==='auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',t); }
+function themeModal(){
+  let cur='auto'; try{ cur=localStorage.getItem('uiTheme')||'auto'; }catch(e){}
+  const grid=h('div',{style:'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px'});
+  const draw=()=>grid.replaceChildren(...THEMES.map(([k,t,ic,bg,ac])=>h('button',{class:'btn',role:'radio','aria-checked':String(cur===k),style:'display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px;text-align:left;height:auto'+(cur===k?';outline:2px solid var(--accent)':''),onclick:()=>{ cur=k; setTheme(k); draw(); }},
+    h('div',{style:'display:flex;gap:4px;align-items:center'},h('span',{style:'width:34px;height:20px;border-radius:5px;border:1px solid #0002;background:'+bg}),h('span',{style:'width:20px;height:20px;border-radius:50%;background:'+ac})),
+    h('div',null,ic+' '+t))));
+  draw();
+  openModal('🎨 เลือกธีม',h('div',null,h('p',{class:'hint'},'เปลี่ยนสีทั้งโปรแกรมทันที · จำค่าไว้ในเครื่องนี้'),grid),[h('button',{class:'btn primary',onclick:closeModal},'ปิด')]);
 }
 function buildRail(){
   const rail=$('#rail'); rail.replaceChildren(h('div',{class:'brand'},'ประมาณราคา / เสนอราคา / เบิกของ'));
@@ -711,6 +730,7 @@ function buildRail(){
     rail.append(b);
   });
   rail.append(h('div',{class:'hint',style:'margin-top:auto;padding:8px 10px'},'ผู้ใช้: ',h('b',null,CU?(CU.name||CU.username):''),' · ',CU?roleLabel(CU):''),
+    h('button',{class:'xtra',onclick:themeModal},h('span',null,'🎨 เลือกธีม')),
     isAdmin()?h('button',{class:'xtra',onclick:prefModal},h('span',null,'🎛 ตั้งค่าการแสดงผล')):null,(typeof SB!=='undefined'&&SB)?h('button',{class:'xtra',onclick:lineModal},h('span',null,'🔔 ผูก LINE')):null,h('button',{class:'xtra',onclick:changeMyPw},h('span',null,'เปลี่ยนรหัสผ่าน')),h('button',{class:'xtra',onclick:logout},h('span',null,'ออกจากระบบ')));
 }
 function updateRail(){
@@ -1138,7 +1158,7 @@ function renderItemRows(){
         h('td',{class:'num'},n0(i.stock)+' '+(i.unit||''),whText(i)?h('div',{class:'hint',style:'white-space:normal'},whText(i)):null),
         h('td',null,num(i.stock)<=0&&num(i.min)>0?h('span',{class:'pill bad'},'หมด'):low?h('span',{class:'pill warn'},'ใกล้หมด'):h('span',{class:'pill good'},'ปกติ')),
         h('td',{style:'white-space:nowrap'},modDate(i.modAt)),h('td',null,i.modBy||''),
-        h('td',{style:'white-space:nowrap'},canEdit('items')?h('button',{class:'btn small',onclick:()=>receiveModal(i)},'รับเข้า'):null,' ',canEdit('items')?h('button',{class:'btn small',title:'ตั้งจำนวนขั้นต่ำ — แจ้งเตือน LINE ทันทีเมื่อต่ำกว่า',onclick:()=>itemMinModal(i)},(Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)?'⚠ ':'')+'ขั้นต่ำ'):null,' ',h('button',{class:'btn small',onclick:()=>itemModal(i)},'แก้ไข')));
+        h('td',{class:'acts',style:'min-width:150px'},canEdit('items')?h('button',{class:'btn small',onclick:()=>receiveModal(i)},'รับเข้า'):null,' ',canEdit('items')?h('button',{class:'btn small',title:'ตั้งจำนวนขั้นต่ำ — แจ้งเตือน LINE ทันทีเมื่อต่ำกว่า',onclick:()=>itemMinModal(i)},(Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)?'⚠ ':'')+'ขั้นต่ำ'):null,' ',h('button',{class:'btn small',onclick:()=>itemModal(i)},'แก้ไข')));
     }),
     h('tr',null,h('td',{colspan:10,class:'hint',style:'text-align:center'},`แสดง ${n0(shown.length)} จาก ${n0(total)} รายการ`+(shown.length<total?' (เลือก "แสดงทั้งหมด" ด้านบนเพื่อดูครบ)':'')))));
   { const ic=prefs().itemCols; hideCols(wrap,['code','name','cat','cost','minp','stock','status','modAt','modBy'].map((c,ix)=>ic[c]===0?ix:-1).filter(x=>x>=0)); }
