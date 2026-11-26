@@ -451,13 +451,21 @@ function userModal(u){
   const drawPerm=()=>{ permBox.style.display=d.role==='custom'?'':'none'; permBox.replaceChildren(h('div',{class:'hint',style:'margin-bottom:6px'},'เลือกสิทธิ์รายเมนู '),
     ...MODS.map(([k,t])=>h('div',{style:'display:flex;gap:10px;align-items:center;margin:4px 0'},h('div',{style:'width:150px'},t),
       h('select',{style:'width:auto','aria-label':'สิทธิ์ '+t,onchange:e=>d.perms[k]=e.target.value},...levelsFor(k).map(([v,l])=>h('option',{value:v,selected:(d.perms[k]||'none')===v},l)))))); };
+  const lineBox=h('div',{class:'card',style:'margin-top:8px;display:none'});
+  if(u&&typeof SB!=='undefined'&&SB){ SB.rpc('admin_line_links').then(({data})=>{ const lk=(data||[]).find(x=>x.user_id===d.id); lineBox.style.display='';
+    if(d.role==='admin'){ lineBox.replaceChildren(h('b',null,'ค้นหาสินค้าทาง LINE'),h('div',{class:'hint'},'แอดมินใช้ได้เต็มสิทธิ์เสมอ')); return; }
+    if(!lk){ lineBox.replaceChildren(h('b',null,'ค้นหาสินค้าทาง LINE'),h('div',{class:'hint'},'ผู้ใช้นี้ยังไม่ได้ผูก LINE — ให้กดเมนู "🔔 ผูก LINE" ในแอปก่อน จึงจะตั้งสิทธิ์ได้')); return; }
+    const chk=h('input',{type:'checkbox',checked:lk.stock_perm!=='none'}); const pr=h('select',{style:'width:auto',disabled:lk.stock_perm==='none','aria-label':'ระดับข้อมูลที่เห็น'},...[['qty','เห็นยอดคงเหลือ (ไม่เห็นราคา)'],['full','เห็นยอด + ราคา']].map(([v,t])=>h('option',{value:v,selected:(lk.stock_perm==='full'?'full':'qty')===v},t)));
+    const save=async v=>{ const {error}=await SB.rpc('admin_line_set_perm',{p_user:d.id,p_perm:v}); toast(error?'ไม่สำเร็จ: '+errMsg(error):'บันทึกสิทธิ์ LINE แล้ว'); };
+    chk.onchange=()=>{ pr.disabled=!chk.checked; save(chk.checked?pr.value:'none'); }; pr.onchange=()=>save(pr.value);
+    lineBox.replaceChildren(h('label',{style:'display:flex;gap:8px;align-items:center;font-weight:700'},chk,'ให้ใช้คำสั่งค้นหาสินค้าทาง LINE'),h('div',{style:'margin-top:6px'},pr),h('div',{class:'hint'},'บันทึกทันทีเมื่อติ๊ก (ไม่ต้องกดปุ่มบันทึกด้านล่าง)')); }); }
   const roleHint=h('div',{class:'hint'},ROLES[d.role]);
   const body=h('div',null,h('div',{class:'grid g2'},
     h('div',{class:'field'},h('label',{for:'u_user'},'USER (ใช้ล็อกอิน)'),h('input',{id:'u_user',value:d.username,disabled:!isNew,oninput:e=>d.username=e.target.value.trim().toLowerCase()})),
     h('div',{class:'field'},h('label',{for:'u_name'},'ชื่อที่แสดง'),h('input',{id:'u_name',value:d.name,oninput:e=>d.name=e.target.value})),
     h('div',{class:'field'},h('label',{for:'u_pw'},isNew?'รหัสผ่าน (อย่างน้อย 6 ตัว)':'รหัสผ่านใหม่ (เว้นว่าง = ไม่เปลี่ยน)'),h('input',{id:'u_pw',type:'password',autocomplete:'new-password',oninput:e=>pw=e.target.value})),
     h('div',{class:'field'},h('label',{for:'u_role'},'บทบาท / ระดับสิทธิ์'),h('select',{id:'u_role',disabled:me,onchange:e=>{d.role=e.target.value;roleHint.textContent=ROLES[d.role];drawPerm();}},...Object.entries(ROLES).map(([k,t])=>h('option',{value:k,selected:k===d.role},t.split(' — ')[0]))))),
-    roleHint,permBox,
+    roleHint,permBox,lineBox,
     h('label',{style:'display:flex;gap:8px;align-items:flex-start;margin-top:10px'},h('input',{type:'checkbox',checked:!!d.perms._all,disabled:d.role==='admin',onchange:e=>{ d.perms._all=e.target.checked; }}),h('span',null,h('b',null,'ดูข้อมูลของทุกคนได้ + เข้าหน้าภาพรวม'),h('div',{class:'hint'},'ถ้าไม่ติ๊ก ผู้ใช้จะเห็นเฉพาะใบเบิกของตัวเอง งานที่ตัวเองได้รับมอบหมาย และหน้า Monitor งานของตัวเอง (admin เห็นทั้งหมดเสมอ)'))),
     h('label',{style:'display:flex;gap:8px;align-items:flex-start;margin-top:10px'},h('input',{type:'checkbox',checked:!!d.disabled,disabled:me,onchange:e=>d.disabled=e.target.checked}),'ระงับการใช้งานผู้ใช้นี้'),
     me?h('div',{class:'hint'},'ปรับบทบาท/ระงับบัญชีตัวเองไม่ได้'):null);
