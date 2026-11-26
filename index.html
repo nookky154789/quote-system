@@ -959,7 +959,7 @@ function vLow(){
       if(!to.length){ toast('ยังไม่ได้เลือกผู้รับ'); return; }
       const sorted=[...all].sort((a,b)=>(num(a.stock)/num(a.min))-(num(b.stock)/num(b.min)));
       const rowsC=sorted.slice(0,40).map(i=>({n:i.name||'',c:i.code||'',v:[n0(i.stock),n0(i.min),n0(buyQty(i))+' '+(i.unit||'')],r:num(i.stock)<=0}));
-      const r=await linePush('⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม '+all.length+' รายการ (หมด '+zero.length+')',true,to,{head:'⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม',color:'#c0392b',title:'ทั้งหมด '+all.length+' รายการ · หมดสต๊อก '+zero.length+' · ใกล้หมด '+(all.length-zero.length),cols:['สินค้า','เหลือ','ขั้นต่ำ','ซื้อเพิ่ม'],rows:rowsC,go:'lowstock',btn:'เปิดหน้ารายการในโปรแกรม'});
+      const r=await linePush('⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม '+all.length+' รายการ (หมด '+zero.length+')',true,to,{head:'⚠️ ของใกล้หมด / ต้องซื้อเพิ่ม',color:'#c0392b',title:'ทั้งหมด '+all.length+' รายการ · หมดสต๊อก '+zero.length+' · ใกล้หมด '+(all.length-zero.length),cols:['สินค้า','เหลือ','ขั้นต่ำ','ซื้อเพิ่ม'],rows:rowsC,po:true,go:'lowstock',btn:'เปิดหน้ารายการในโปรแกรม'});
       toast(r&&r.ok?'ส่ง LINE แล้ว ('+r.sent+' คน'+(r.skipped?' · '+r.skipped+' คนยังไม่ผูก LINE':'')+')':(r&&r.error==='recipients not linked'?'ผู้รับที่เลือกยังไม่ได้ผูก LINE':'ส่งไม่สำเร็จ: '+((r&&r.error)||'ไม่ทราบสาเหตุ')),r&&r.ok?undefined:6000);
     };
     const send=async()=>{
