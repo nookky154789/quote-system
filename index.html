@@ -858,6 +858,22 @@ function itemSortFn(k){
     cost_d:(a,b)=>num(b.cost)-num(a.cost),cost_a:(a,b)=>num(a.cost)-num(b.cost),stock_d:(a,b)=>num(b.stock)-num(a.stock),stock_a:(a,b)=>num(a.stock)-num(b.stock),
     low:(a,b)=>((num(a.min)>0?num(a.stock)/num(a.min):1e9)-(num(b.min)>0?num(b.stock)/num(b.min):1e9))}[k]||(()=>0);
 }
+function itemMinModal(it){
+  if(!canEdit('items')) return;
+  const rc=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const nameOf=id=>((TEAM||[]).find(u=>u.id===id)||{}).name||'?';
+  const inp=h('input',{type:'number',min:'0',step:'any',value:it.min||'',id:'imin',style:'max-width:200px'});
+  const la=it.lowAlert, acks=la&&la.acks?Object.keys(la.acks):[];
+  const lowNow=Number(it.min)>0&&(Number(it.stock)||0)<=Number(it.min);
+  const save=async()=>{ const v=Math.max(0,num(inp.value)); if(!await put('items',it.id,strip({...it,min:v}))) return; it.min=v; closeModal(); toast(v>0?('ตั้งขั้นต่ำ '+n0(v)+' '+(it.unit||'')+' แล้ว'+((Number(it.stock)||0)<=v?' — ต่ำกว่าขั้นต่ำ ระบบแจ้ง LINE ทันที':'')):'ยกเลิกขั้นต่ำแล้ว'); render(); };
+  openModal('ตั้งจำนวนขั้นต่ำ',h('div',null,
+    h('div',{style:'font-weight:700'},it.name||''),h('div',{class:'mono hint'},it.code||''),
+    h('p',null,'คงเหลือตอนนี้: ',h('b',{style:lowNow?'color:#c0392b':''},n0(it.stock)+' '+(it.unit||''))),
+    h('div',{class:'field'},h('label',{for:'imin'},'จำนวนขั้นต่ำ (จุดสั่งซื้อ)'),inp),
+    h('p',{class:'hint'},'เมื่อคงเหลือเท่ากับหรือต่ำกว่าค่านี้ ระบบส่ง LINE แจ้งทันที พร้อมปุ่ม "รับทราบ" — ถ้าผู้รับไม่กดรับทราบ จะเตือนซ้ำทุกเช้า 08:00 จนกว่าจะกดหรือมีของเข้า · ผู้รับ: '+(rc.length?rc.map(nameOf).join(', '):'แอดมิน (ยังไม่ได้เลือกใน ตั้งค่า > แจ้งของใกล้หมด)')),
+    lowNow?h('p',{class:'hint'},la&&la.at?('แจ้งครั้งล่าสุด '+logTs(la.at)+' · รับทราบแล้ว: '+(acks.length?acks.map(nameOf).join(', '):'ยังไม่มี')):'อยู่ในสถานะต่ำกว่าขั้นต่ำ'):null),
+    [h('button',{class:'btn',onclick:closeModal},'ยกเลิก'),h('button',{class:'btn primary',onclick:save},'บันทึก')]);
+  setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(e){} },50);
+}
 function lowItems(){ return S.items.filter(i=>Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)).sort((a,b)=>((Number(a.stock)||0)/Number(a.min))-((Number(b.stock)||0)/Number(b.min))); }
 let _msQ='', _msF='set';
 async function minStockModal(){
@@ -1122,7 +1138,7 @@ function renderItemRows(){
         h('td',{class:'num'},n0(i.stock)+' '+(i.unit||''),whText(i)?h('div',{class:'hint',style:'white-space:normal'},whText(i)):null),
         h('td',null,num(i.stock)<=0&&num(i.min)>0?h('span',{class:'pill bad'},'หมด'):low?h('span',{class:'pill warn'},'ใกล้หมด'):h('span',{class:'pill good'},'ปกติ')),
         h('td',{style:'white-space:nowrap'},modDate(i.modAt)),h('td',null,i.modBy||''),
-        h('td',{style:'white-space:nowrap'},canEdit('items')?h('button',{class:'btn small',onclick:()=>receiveModal(i)},'รับเข้า'):null,' ',h('button',{class:'btn small',onclick:()=>itemModal(i)},'แก้ไข')));
+        h('td',{style:'white-space:nowrap'},canEdit('items')?h('button',{class:'btn small',onclick:()=>receiveModal(i)},'รับเข้า'):null,' ',canEdit('items')?h('button',{class:'btn small',title:'ตั้งจำนวนขั้นต่ำ — แจ้งเตือน LINE ทันทีเมื่อต่ำกว่า',onclick:()=>itemMinModal(i)},(Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)?'⚠ ':'')+'ขั้นต่ำ'):null,' ',h('button',{class:'btn small',onclick:()=>itemModal(i)},'แก้ไข')));
     }),
     h('tr',null,h('td',{colspan:10,class:'hint',style:'text-align:center'},`แสดง ${n0(shown.length)} จาก ${n0(total)} รายการ`+(shown.length<total?' (เลือก "แสดงทั้งหมด" ด้านบนเพื่อดูครบ)':'')))));
   { const ic=prefs().itemCols; hideCols(wrap,['code','name','cat','cost','minp','stock','status','modAt','modBy'].map((c,ix)=>ic[c]===0?ix:-1).filter(x=>x>=0)); }
