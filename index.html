@@ -2875,6 +2875,53 @@ async function poCreate(lines,job,note){
 const poSupShort=p=>{ const n=[...new Set((p.lines||[]).map(l=>String(l.sup||'').trim()).filter(Boolean))]; return n.length>3?n.length+' ร้าน (เปิดดูรายละเอียด)':(n.join(', ')||(!String(p.supplier||'').includes(', ')?p.supplier:'')||'-'); };
 const poSupNames=ls=>[...new Set((ls||[]).map(l=>String(l.sup||'').trim()).filter(Boolean))].join(', ');
 /* เทียบราคา: รายการที่มีหลายร้านที่มีราคา */
+function poBuyHtml(p){
+  const RH=9.2, BUD=128, LH=2.95;
+  const sp=l=>String(l.sup||(!String(p.supplier||'').includes(', ')?p.supplier:'')||'').trim()||'ไม่ระบุร้าน';
+  const lastPo=new Map();
+  (S.po||[]).forEach(o=>{ if(o===p||(o.id&&o.id===p.id)||o.no===p.no) return; (o.lines||[]).forEach(l=>{ if(!l.itemId) return; const c=lastPo.get(l.itemId); if(!c||String(o.date||'')>String(c.date||'')) lastPo.set(l.itemId,{date:o.date,qty:num(l.qty),price:num(l.price),sup:l.sup||o.supplier||''}); }); });
+  const g=new Map(); (p.lines||[]).forEach(l=>{ const k=sp(l); (g.get(k)||g.set(k,[]).get(k)).push(l); });
+  const cell=(t,cls)=>`<td class="${cls||''}"><div class="k">${t}</div></td>`;
+  const stack=a=>a.map(x=>esc(x)).join('<br>');
+  let save=0;
+  const pages=[];
+  const sg=[['ผู้ขอซื้อ',p.requester||p.by||''],['เจ้าหน้าที่จัดซื้อ',''],['เจ้าหน้าที่สต็อก',''],['ผู้ตรวจสอบ',(p.appr&&p.appr.by)||''],['ผู้อนุมัติ','']].map(([a,b])=>`<div class="sg"><span>(${esc(b)||'_______________'})</span><b>${a}</b></div>`).join('');
+  const colg='<colgroup>'+[8,56,12,14,16,9,12,22,16,10,13,15,9,10,26,10,13,11].map(w=>`<col style="width:${w}mm">`).join('')+'</colgroup>';
+  const th='<thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">รายการสินค้า</th><th colspan="5">จำนวนที่ขอซื้อ</th><th colspan="7">ซื้อครั้งล่าสุด</th><th colspan="4">เปรียบเทียบราคา 3 เจ้า</th></tr><tr><th>จำนวน</th><th>ราคา/หน่วย</th><th>ราคารวม</th><th>ส่วนลด</th><th class="rd">หมายเหตุ</th><th>Supplier</th><th>ว/ด/ป</th><th>จำนวน</th><th>ราคา/หน่วย</th><th>ราคารวม</th><th>ส่วนลด</th><th>หมายเหตุ</th><th>Supplier</th><th>จำนวน</th><th>ราคา/หน่วย</th><th>หมายเหตุ</th></tr></thead>';
+  const blank=`<tr style="height:${RH}mm">${Array(18).fill('<td></td>').join('')}</tr>`;
+  g.forEach((ls,sup)=>{ let no=0, tot=0, pgs=[], cur=[], used=0;
+    ls.forEach(l=>{ const it=l.itemId&&S.items.find(i=>i.id===l.itemId), q=num(l.qty), pr=num(l.price), t=q*pr; tot+=t; no++;
+      const lp=l.itemId&&lastPo.get(l.itemId);
+      let ld=lp?{sup:lp.sup,date:lp.date,qty:lp.qty,price:lp.price}:null;
+      if(!ld&&it){ const s=[...(it.suppliers||[])].filter(x=>x.name&&num(x.price)>0&&x.date).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]; if(s) ld={sup:s.name,date:s.date,qty:'',price:num(s.price)}; }
+      const offers=it?(()=>{ const m=new Map(); (it.suppliers||[]).forEach(s=>{ const x=num(s.price); if(s.name&&x>0&&(!m.has(s.name)||x<m.get(s.name))) m.set(s.name,x); }); return [...m].map(([name,price])=>({name,price})).sort((a,b)=>a.price-b.price).slice(0,3); })():[];
+      if(offers.length>1) save+=Math.max(0,(offers[offers.length-1].price-pr)*q);
+      const row=`<tr style="height:${RH}mm">${cell(no,'c')}${cell(esc((l.code?l.code+'  ':'')+(l.name||'')))}${cell(n0(q)+' '+esc(l.unit||''),'c')}${cell(n2(pr),'r')}${cell(n2(t),'r')}${cell('')}${cell(l.need?esc(thDate(l.need)||l.need):'','c')}`
+        +(ld?`${cell(esc(String(ld.sup).slice(0,24)),'s')}${cell(esc(thDate(ld.date)||ld.date||''),'c')}${cell(ld.qty===''?'':n0(ld.qty),'c')}${cell(n2(ld.price),'r')}${cell(ld.qty===''?'':n2(ld.qty*ld.price),'r')}${cell('')}${cell('')}`:Array(7).fill(cell('')).join(''))
+        +(offers.length?`<td class="s"><div class="k">${stack(offers.map(o=>o.name.slice(0,22)))}</div></td><td class="c"><div class="k">${stack(offers.map(()=>n0(q)))}</div></td><td class="r"><div class="k">${stack(offers.map(o=>n2(o.price)))}</div></td><td class="s"><div class="k">${stack(offers.map((o,j)=>(o.name===sup?'◀ ':'')+(j===0?'ต่ำสุด':'')))}</div></td>`:Array(4).fill(cell('')).join(''))+'</tr>';
+      if(used+RH>BUD){ pgs.push({rows:cur,used}); cur=[]; used=0; }
+      cur.push(row); used+=RH; });
+    if(used+RH>BUD){ pgs.push({rows:cur,used}); cur=[]; used=0; }
+    cur.push(`<tr class="st" style="height:${RH}mm"><td colspan="4" class="r"><div class="k">รวม ${esc(sup)} (${ls.length} รายการ)</div></td>${cell(n2(tot),'r')}${Array(13).fill('<td></td>').join('')}</tr>`); used+=RH;
+    pgs.push({rows:cur,used});
+    pgs.forEach(pg=>pages.push({sup,...pg})); });
+  const fld=(a,v,w,r)=>`<div class="fl" style="width:${w}"><b${r?' class="rq"':''}>${a}</b><span>${esc(v||'')}</span></div>`;
+  const body=pages.map(pg=>{ let rem=BUD-pg.used,bl=''; while(rem>=RH){ bl+=blank; rem-=RH; } if(rem>0.3) bl+=`<tr style="height:${rem.toFixed(2)}mm">${Array(18).fill('<td></td>').join('')}</tr>`;
+    return `<div class="pg"><div class="box"><div class="ttl"><b>ใบขอซื้อของจัดซื้อ (Purchase Request)</b><span class="rq">แผนก ${esc(p.dept||'')||'_______________'} &nbsp; คลัง _________</span></div>
+<div class="inf">${fld('ใช้ในงาน',p.job,'60%')}${fld('JA./JB.',p.jaNo,'40%')}</div>
+<div class="inf">${fld('วันที่ขอซื้อ',thDate(p.date),'24%')}${fld('วันที่ต้องการใช้','','24%',1)}${fld('ซื้อที่ร้าน/บริษัท',pg.sup==='ไม่ระบุร้าน'?'':pg.sup,'30%')}${fld('เลขที่ PR NO.',p.no,'22%')}</div>
+<table class="m">${colg}${th}<tbody>${pg.rows.join('')}${bl}</tbody></table>
+<div class="ft"><div class="fl2"><div class="sv"><b class="rq">ประเมินค่าสั่งซื้อ(ยอด SAVE) :</b> ${save>0?n2(save)+' บาท':''}</div><div class="nt"><b class="rq">หมายเหตุ :</b> ${esc(p.note||'')}</div></div><div class="rs"><b class="rq">เหตุผล :</b></div><div class="sgs">${sg}</div></div></div></div>`; }).join('');
+  return `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>ใบขอซื้อของจัดซื้อ ${esc(p.no||'')}</title><style>
+@page{size:A4 landscape;margin:6mm}*{box-sizing:border-box}body{font:10px/1.25 Tahoma,'Leelawadee UI','Noto Sans Thai',sans-serif;color:#111;margin:0}
+.pg{height:198mm;overflow:hidden;page-break-after:always}.pg:last-child{page-break-after:auto}.box{height:198mm;border:1.5px solid #111;overflow:hidden;display:flex;flex-direction:column}
+.ttl{height:8mm;display:flex;border-bottom:1px solid #111;align-items:center}.ttl b{flex:1;text-align:center;font-size:13px}.ttl span{width:75mm;padding-left:3mm;border-left:1px solid #111;height:100%;line-height:8mm}
+.inf{height:7mm;display:flex;border-bottom:1px solid #111}.fl{display:flex;gap:2px;padding:0 2mm;border-right:1px solid #111;align-items:center;white-space:nowrap}.fl:last-child{border-right:0}.fl span{flex:1;border-bottom:1px solid #999;overflow:hidden;height:4mm}.rq{color:#d91a1a}
+table.m{width:100%;table-layout:fixed;border-collapse:collapse;height:${BUD+12}mm}table.m th,table.m td{border:1px solid #111;padding:0;overflow:hidden;vertical-align:top}table.m th{height:5.5mm;font-size:9px;line-height:3.6mm;text-align:center}table.m tr>:first-child{border-left:0}table.m tr>:last-child{border-right:0}
+.k{padding:.4mm 1mm;overflow:hidden;line-height:${LH}mm;height:100%;font-size:9px}td.c{text-align:center}td.r{text-align:right}td.s .k{font-size:8px}th.rd{color:#d91a1a}tr.st td{font-weight:700;background:#eef2f6}
+.ft{display:flex;flex:none;margin-top:auto;height:22mm;border-top:1.5px solid #111}.fl2{width:75mm;border-right:1px solid #111;display:flex;flex-direction:column}.sv{height:11mm;border-bottom:1px solid #111;padding:1mm 2mm}.nt{flex:1;padding:1mm 2mm}.rs{width:30mm;border-right:1px solid #111;padding:1mm 2mm}
+.sgs{flex:1;display:grid;grid-template-columns:repeat(5,1fr)}.sg{text-align:center;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:2mm;font-size:9px}.sg b{margin-top:1mm}</style></head><body>${body}</body></html>`;
+}
 function poCompare(p){
   const out=[];
   (p.lines||[]).forEach(l=>{ const it=l.itemId&&S.items.find(i=>i.id===l.itemId); if(!it) return;
@@ -3064,6 +3111,7 @@ function poModal(src){
     closeModal(); toast('แยกเป็น '+made.length+' ใบ: '+made.join(', ')); }
   if(ed) foot.push(h('button',{class:'btn primary',onclick:()=>saveDoc(false)},'บันทึก'));
   openModal((isNew?'ใบสั่งซื้อใหม่':'ใบสั่งซื้อ '+d.no),body,foot); modalExport(()=>tPo(d));
+  if(!isNew){ const ff=document.querySelector('#layer .modal footer'); if(ff) ff.prepend(h('button',{class:'btn small',title:'ฟอร์มใบขอซื้อของฝ่ายจัดซื้อ (A4 แนวนอน) แยกฟอร์มตามร้าน',onclick:()=>pdfSave(poBuyHtml(d),'ใบขอซื้อจัดซื้อ '+(d.no||''),true)},'ฟอร์มจัดซื้อ (PDF)')); }
 }
 function poReceive(p){
   const rows=(p.lines||[]).map(l=>({l,q:Math.max(0,+(num(l.qty)-num(l.recv)).toFixed(4))})).filter(r=>r.q>0);
