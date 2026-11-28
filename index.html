@@ -168,6 +168,147 @@ nav.rail .ic,nav.rail .short{display:none}
 @media (prefers-reduced-motion:no-preference){.btn{transition:border-color .12s}}
 input.calc{background:var(--soft,#eef6f7);font-weight:600}
 .hint.mono{font-size:11px;word-break:break-all;max-width:150px}
+
+/* ===== UI v2: modern glass / aurora look (ทับสไตล์เดิม ใช้ตัวแปรสีเดิม รองรับธีม/โหมดมืด) ===== */
+:root{--r:14px;--sh1:0 1px 2px rgba(16,32,48,.06),0 4px 14px rgba(16,32,48,.06);--sh2:0 2px 4px rgba(16,32,48,.06),0 12px 32px rgba(16,32,48,.12);--glass:color-mix(in srgb,var(--panel) 82%,transparent);--ring:color-mix(in srgb,var(--accent) 28%,transparent);--grad:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#7c5cff))}
+body{background:
+  radial-gradient(900px 520px at 6% -8%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 62%),
+  radial-gradient(760px 480px at 98% 2%,color-mix(in srgb,#7c5cff 12%,transparent),transparent 60%),
+  radial-gradient(700px 520px at 60% 108%,color-mix(in srgb,#14b8a6 10%,transparent),transparent 60%),var(--bg);background-attachment:fixed;letter-spacing:.005em}
+.card,.tablewrap{background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:var(--r);box-shadow:var(--sh1)}
+.tablewrap{box-shadow:var(--sh1);overflow-x:auto}
+th{background:color-mix(in srgb,var(--accent) 6%,var(--panel));text-transform:none;letter-spacing:.02em;font-size:12px;border-bottom:1px solid var(--line)}
+tbody tr,table tr{transition:background .12s}
+table tr:hover td{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+td,th{border-bottom-color:color-mix(in srgb,var(--line) 70%,transparent)}
+h1{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.btn{border-radius:10px;background:var(--glass);border-color:color-mix(in srgb,var(--line) 85%,transparent);box-shadow:0 1px 1px rgba(16,32,48,.04);transition:transform .12s,box-shadow .15s,border-color .12s,background .12s}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--sh1);border-color:var(--accent)}
+.btn:active{transform:translateY(0)}
+.btn.primary{background:var(--grad);border-color:transparent;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 38%,transparent)}
+.btn.primary:hover{filter:brightness(1.07);box-shadow:0 6px 20px color-mix(in srgb,var(--accent) 48%,transparent)}
+input,select,textarea{border-radius:10px;background:color-mix(in srgb,var(--panel) 90%,transparent);transition:border-color .12s,box-shadow .12s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 4px var(--ring)}
+.pill{padding:2px 10px;font-weight:500;border:1px solid transparent}
+.modal-bg{-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);background:rgba(8,16,28,.42)}
+.modal{border-radius:18px;box-shadow:var(--sh2);background:color-mix(in srgb,var(--panel) 96%,transparent)}
+.toast{border-radius:12px;box-shadow:var(--sh2)}
+@media(min-width:761px){
+  .app{grid-template-columns:232px minmax(0,1fr)}
+  nav.rail{margin:12px 0 12px 12px;border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:20px;background:var(--glass);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:var(--sh1);height:calc(100% - 24px);padding:14px 10px}
+  .brand{font-size:17px;padding:6px 10px 16px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand small{-webkit-text-fill-color:var(--muted)}
+  nav.rail button{border-radius:12px;padding:10px 12px;transition:background .12s,transform .12s}
+  nav.rail button:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);transform:translateX(2px)}
+  nav.rail button[aria-current="page"]{background:var(--grad);box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 40%,transparent)}
+  main{padding:22px 28px 60px}
+}
+/* --- Overview (หน้าภาพรวม) --- */
+.hm-hero{position:relative;overflow:hidden;border-radius:22px;padding:22px 24px;margin-bottom:16px;color:#fff;background:linear-gradient(120deg,#0b4f5c 0%,var(--accent) 48%,#7c5cff 120%);box-shadow:0 14px 40px color-mix(in srgb,var(--accent) 35%,transparent)}
+.hm-hero:before{content:"";position:absolute;inset:-40% -10% auto auto;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.28),transparent 65%)}
+.hm-hero:after{content:"";position:absolute;inset:auto auto -60% 20%;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 65%)}
+.hm-hero>*{position:relative;z-index:1}
+.hm-hero h1{color:#fff;margin:0 0 2px;font-size:26px}
+.hm-hero .dt{opacity:.85;font-size:14px;margin-bottom:14px}
+.hm-chips{display:flex;flex-wrap:wrap;gap:8px}
+.hm-chip{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center;padding:7px 14px;border-radius:99px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:14px;transition:background .15s,transform .15s}
+.hm-chip:hover{background:rgba(255,255,255,.28);transform:translateY(-1px)}
+.hm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:16px}
+.kpi{position:relative;overflow:hidden;padding:16px 16px 12px;border-radius:18px;background:var(--glass);border:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-shadow:var(--sh1);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transition:transform .18s,box-shadow .18s;color:var(--tone,var(--accent))}
+.kpi.click{cursor:pointer}.kpi.click:hover{transform:translateY(-3px);box-shadow:var(--sh2)}
+.kpi .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px;background:color-mix(in srgb,currentColor 14%,transparent);margin-bottom:10px}
+.kpi .v{font:700 26px/1.1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .l{color:var(--muted);font-size:13px;margin-top:3px}
+.kpi .s{color:var(--muted);font-size:12px;margin-top:2px;opacity:.9}
+.kpi .sp-w{position:absolute;right:10px;top:14px;width:104px;height:38px;opacity:.95}
+.kpi .sp{width:100%;height:100%}
+.kpi.bad{--tone:var(--bad)}.kpi.good{--tone:var(--good)}.kpi.warn{--tone:var(--warn)}.kpi.vio{--tone:#7c5cff}
+.hm-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+@media(max-width:980px){.hm-grid{grid-template-columns:1fr}}
+.hm-card{padding:16px 18px;border-radius:18px}
+.hm-card h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0 0 12px}
+.hm-card h2 .more{margin-left:auto;font-size:12.5px;font-weight:500;color:var(--accent);cursor:pointer}
+.todo{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer;transition:background .12s,transform .12s;border:1px solid transparent}
+.todo+.todo{margin-top:6px}
+.todo:hover{background:color-mix(in srgb,var(--accent) 8%,transparent);transform:translateX(2px);border-color:color-mix(in srgb,var(--line) 70%,transparent)}
+.todo .tic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:17px;flex:none;background:var(--warn-soft)}
+.todo.bad .tic{background:var(--bad-soft)}.todo.good .tic{background:var(--good-soft)}.todo.info .tic{background:var(--accent-soft)}
+.todo b{display:block;font-weight:600}.todo small{color:var(--muted)}
+.todo .n{margin-left:auto;font:700 18px var(--mono);padding:2px 12px;border-radius:99px;background:var(--warn-soft);color:var(--warn)}
+.todo.bad .n{background:var(--bad-soft);color:var(--bad)}.todo.info .n{background:var(--accent-soft);color:var(--accent)}
+.seg{display:flex;height:12px;border-radius:99px;overflow:hidden;background:color-mix(in srgb,var(--line) 60%,transparent);margin:6px 0 8px}
+.seg i{display:block;height:100%;transition:width .4s}
+.lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.lg span:before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);margin-right:6px}
+.lw{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center;padding:7px 0;border-bottom:1px dashed color-mix(in srgb,var(--line) 70%,transparent)}
+.lw:last-child{border-bottom:0}
+.lw .nm{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lw .q{font:12.5px var(--mono);color:var(--muted);text-align:right}
+.lw .bar2{grid-column:1/-1;height:6px;border-radius:99px;background:color-mix(in srgb,var(--line) 60%,transparent);overflow:hidden}
+.lw .bar2 i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--bad),var(--warn))}
+.tl{position:relative;padding-left:18px}
+.tl:before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:color-mix(in srgb,var(--line) 80%,transparent)}
+.tl .it{position:relative;padding:5px 0 9px}
+.tl .it:before{content:"";position:absolute;left:-17px;top:11px;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.tl .it b{font-family:var(--mono);font-size:13px}.tl .it small{display:block;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ===== UI v3: Glassmorphism (frosted glass บนพื้นหลังเบลอสีสด + การ์ดขาว + ปุ่มเหลืองอำพัน) ===== */
+:root{--amber:#f7b500;--amber2:#ffd24d;--gl:rgba(255,255,255,.34);--gl-b:rgba(255,255,255,.55);--gl-in:rgba(255,255,255,.78)}
+@media(prefers-color-scheme:dark){:root{--gl:rgba(30,38,52,.42);--gl-b:rgba(255,255,255,.14);--gl-in:rgba(30,38,52,.72)}}
+body{background:#cfd8e3;position:relative}
+body:before{content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none;filter:blur(70px) saturate(1.3);
+  background:
+   radial-gradient(38% 34% at 12% 12%,#ff9a8b 0,transparent 70%),
+   radial-gradient(34% 34% at 88% 8%,#ffd86b 0,transparent 70%),
+   radial-gradient(40% 40% at 78% 82%,#7cc7ff 0,transparent 70%),
+   radial-gradient(36% 36% at 18% 88%,#b69cff 0,transparent 70%),
+   radial-gradient(30% 30% at 50% 48%,#8fe3c8 0,transparent 72%);animation:orb 26s ease-in-out infinite alternate}
+@keyframes orb{to{transform:translate3d(2%,-2%,0) scale(1.08) rotate(3deg)}}
+.card,.tablewrap,.kpi,nav.rail{background:var(--gl)!important;border:1px solid var(--gl-b)!important;-webkit-backdrop-filter:blur(22px) saturate(1.6);backdrop-filter:blur(22px) saturate(1.6);box-shadow:0 8px 32px rgba(31,38,80,.12),inset 0 1px 0 rgba(255,255,255,.5)!important}
+.modal{background:var(--gl-in)!important;border:1px solid var(--gl-b);-webkit-backdrop-filter:blur(26px) saturate(1.5);backdrop-filter:blur(26px) saturate(1.5)}
+th{background:rgba(255,255,255,.28)}
+table tr:hover td{background:rgba(255,255,255,.35)}
+input,select,textarea{background:var(--gl-in)}
+.btn{background:var(--gl-in);border-color:var(--gl-b)}
+/* ปุ่มหลัก = เหลืองอำพันแบบในแบบ */
+.btn.primary{background:linear-gradient(180deg,var(--amber2),var(--amber));color:#3a2a00;border-color:transparent;font-weight:600;box-shadow:0 6px 18px rgba(247,181,0,.45)}
+.btn.primary:hover{filter:none;box-shadow:0 8px 24px rgba(247,181,0,.6)}
+nav.rail button[aria-current="page"]{background:linear-gradient(180deg,var(--amber2),var(--amber))!important;color:#3a2a00!important;font-weight:600;box-shadow:0 8px 20px rgba(247,181,0,.45)!important}
+.brand{background:none!important;-webkit-text-fill-color:initial!important;color:var(--ink)!important}
+/* ฮีโร่: กระจกฝ้า */
+.hm-hero{background:var(--gl)!important;color:var(--ink);border:1px solid var(--gl-b);-webkit-backdrop-filter:blur(24px) saturate(1.6);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 14px 44px rgba(31,38,80,.16),inset 0 1px 0 rgba(255,255,255,.6)}
+.hm-hero:before{background:radial-gradient(circle,rgba(255,210,77,.55),transparent 65%)}
+.hm-hero:after{background:radial-gradient(circle,rgba(124,92,255,.28),transparent 65%)}
+.hm-hero h1{color:var(--ink)}
+.hm-hero .dt{opacity:.75}
+.hm-chip{background:var(--gl-in);color:var(--ink);border:1px solid var(--gl-b);box-shadow:0 4px 14px rgba(31,38,80,.08);font-weight:500}
+.hm-chip:hover{background:linear-gradient(180deg,var(--amber2),var(--amber));color:#3a2a00;border-color:transparent}
+/* KPI: การ์ดขาวลอยบนกระจก */
+.kpi{background:var(--gl-in)!important}
+.kpi .ic{background:linear-gradient(180deg,var(--amber2),var(--amber));color:#3a2a00;box-shadow:0 6px 14px rgba(247,181,0,.4)}
+.kpi.bad .ic{background:linear-gradient(180deg,#ff9a8b,#ef5350);color:#fff;box-shadow:0 6px 14px rgba(239,83,80,.4)}
+.kpi.good .ic{background:linear-gradient(180deg,#7be0a8,#22a861);color:#fff;box-shadow:0 6px 14px rgba(34,168,97,.4)}
+.kpi.vio .ic{background:linear-gradient(180deg,#b69cff,#7c5cff);color:#fff;box-shadow:0 6px 14px rgba(124,92,255,.4)}
+.todo:hover{background:var(--gl-in)}
+.todo .tic{background:linear-gradient(180deg,var(--amber2),var(--amber))}
+.todo.bad .tic{background:linear-gradient(180deg,#ff9a8b,#ef5350)}
+.todo .n{background:var(--amber);color:#3a2a00}
+.todo.bad .n{background:#ef5350;color:#fff}
+.lw .bar2 i{background:linear-gradient(90deg,#ef5350,var(--amber))}
+.tl .it:before{background:var(--amber);box-shadow:0 0 0 3px rgba(247,181,0,.25)}
+.hm-card h2 .more{color:#a36b00}
+/* ปุ่มลอยกลางล่างบนมือถือ (เหมือนแบบ) */
+.fab{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);width:62px;height:62px;border-radius:50%;border:0;cursor:pointer;z-index:40;font-size:26px;display:none;place-items:center;background:linear-gradient(180deg,var(--amber2),var(--amber));box-shadow:0 10px 28px rgba(247,181,0,.6),inset 0 2px 0 rgba(255,255,255,.6);color:#3a2a00}
+@media(max-width:760px){
+  .fab{display:grid}
+  nav.rail{border-radius:22px 22px 0 0;-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px)}
+  .hm-hero{border-radius:26px;padding:18px}
+  .hm-chips{flex-wrap:nowrap;overflow-x:auto;margin:0 -6px;padding:2px 6px 6px;scrollbar-width:none}
+  .hm-chip{flex:none}
+  .kpi{border-radius:22px}
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.card,.tablewrap,.kpi,nav.rail,.modal,.hm-hero{background:var(--panel)!important}}
 </style>
 </head>
 <body>
@@ -762,31 +903,77 @@ function render(){
 }
 
 /* ---------- Home ---------- */
+function hmSpark(vals){
+  const w=120,hh=38,mx=Math.max(1,...vals),n=vals.length;
+  const pts=vals.map((v,i)=>[i*(w/Math.max(1,n-1)),hh-4-(v/mx)*(hh-10)]);
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  return '<svg viewBox="0 0 '+w+' '+hh+'" preserveAspectRatio="none" class="sp"><path d="'+d+' L'+w+' '+hh+' L0 '+hh+' Z" fill="currentColor" opacity=".13"/><path d="'+d+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+function hmDays(arr,f,days=14){
+  const out=[]; const base=new Date(Date.now()+7*3600000);
+  const idx=new Map();
+  for(let i=days-1;i>=0;i--){ const d=new Date(base.getTime()-i*86400000).toISOString().slice(0,10); idx.set(d,out.length); out.push(0); }
+  (arr||[]).forEach(x=>{ const k=String(f(x)||'').slice(0,10); if(idx.has(k)) out[idx.get(k)]++; });
+  return out;
+}
 function vHome(){
   const low = S.items.filter(i=>num(i.stock)<=num(i.min) && num(i.min)>0);
   const stockVal = S.items.reduce((a,i)=>a+num(i.stock)*num(i.cost),0);
   const open = S.quotes.filter(q=>['draft','sent'].includes(q.status||'draft'));
   const openVal = open.reduce((a,q)=>a+quoteCalc(q).total,0);
-  const won = S.quotes.filter(q=>q.status==='won').reduce((a,q)=>a+quoteCalc(q).total,0);
-  const el=h('div',null,h('h1',null,'ภาพรวม'),h('p',{class:'sub'},'สรุปสต๊อก ใบเสนอราคาที่ค้าง และรายการเบิกล่าสุด'));
-  el.append(h('div',{class:'tiles'},
-    tile(S.items.length,'รายการวัสดุ'),
-    tile(n2(stockVal),'มูลค่าสต๊อก (บาท)'),
-    (()=>{ const t=tile(low.length,'ใกล้หมด / หมด (กดดูรายการ)',low.length?'bad':null); t.style.cursor='pointer'; t.onclick=()=>{ view='lowstock'; render(); }; return t; })(),
-    tile(open.length+' ใบ',`ใบเสนอราคาที่รอผล ${n2(openVal)} บาท`),
-    tile(n2(won),'ปิดการขายแล้ว (บาท, รวม VAT)')
-  ));
-  const cols=h('div',{class:'grid g2'});
-  const c1=h('div',{class:'card'},h('h2',null,'วัสดุที่ต้องสั่งเพิ่ม'));
+  const wonQ = S.quotes.filter(q=>q.status==='won'); const won = wonQ.reduce((a,q)=>a+quoteCalc(q).total,0);
+  const poOpen = S.po.filter(p=>['draft','sent','partial'].includes(p.status));
+  const poOpenVal = poOpen.reduce((a,p)=>a+poTotal(p),0);
+  const wds = vwd();
+  const go=(v,fn)=>()=>{ view=v; if(fn) fn(); render(); };
+  const kpi=(ic,l,v,sub,tone,click,series)=>{ const k=h('div',{class:'kpi'+(tone?' '+tone:'')+(click?' click':''),onclick:click||null},h('div',{class:'ic'},ic),h('div',{class:'v'},v),h('div',{class:'l'},l),sub?h('div',{class:'s'},sub):null);
+    if(series){ const w=h('span',{class:'sp-w'}); w.innerHTML=hmSpark(series); k.append(w); } return k; };
+  const el=h('div',{class:'hm'});
+  const who=(CU&&(CU.name||CU.username))||'';
+  const hr=new Date(Date.now()+7*3600000).getUTCHours(); const greet=hr<12?'สวัสดีตอนเช้า':hr<17?'สวัสดีตอนบ่าย':'สวัสดีตอนเย็น';
+  const hero=h('div',{class:'hm-hero'},h('h1',null,greet+(who?' คุณ'+who:'')),h('div',{class:'dt'},new Date().toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' · สรุปภาพรวมสต๊อก งานขาย และการสั่งซื้อ'));
+  const chips=h('div',{class:'hm-chips'});
+  [['po','สั่งซื้อ'],['withdrawals','เบิกของ'],['items','วัสดุ'],['boms','BOM'],['estimates','ประมาณราคา'],['quotes','ใบเสนอ'],['reports','รายงาน']].forEach(([k,t])=>{ if(canView(k)&&menuOn(k)) chips.append(h('button',{class:'hm-chip',onclick:go(k)},(TAB_ICON[k]||'')+' '+t)); });
+  hero.append(chips); el.append(hero);
+  el.append(h('div',{class:'hm-kpis'},
+    kpi('📦','มูลค่าสต๊อก (บาท)',n2(stockVal),n0(S.items.length)+' รายการวัสดุ',null,go('items')),
+    kpi('⚠️','ใกล้หมด / หมด',n0(low.length),low.length?'กดดูรายการที่ต้องสั่งเพิ่ม':'ทุกรายการอยู่เหนือจุดสั่งซื้อ',low.length?'bad':'good',go('lowstock')),
+    kpi('🛒','ใบสั่งซื้อที่ยังไม่ปิด',n0(poOpen.length)+' ใบ','มูลค่า '+n2(poOpenVal)+' บาท','vio',go('po',()=>{ poF='open'; poA='all'; }),hmDays(S.po,p=>p.date)),
+    kpi('📤','เบิกของ 14 วันล่าสุด',n0(hmDays(wds,w=>w.date).reduce((a,b)=>a+b,0))+' ใบ','ทั้งหมด '+n0(wds.length)+' ใบ',null,go('withdrawals'),hmDays(wds,w=>w.date)),
+    kpi('📄','ใบเสนอราคาที่รอผล',n0(open.length)+' ใบ',n2(openVal)+' บาท','warn',go('quotes'),hmDays(S.quotes,q=>q.date)),
+    kpi('🏆','ปิดการขายแล้ว (บาท)',n2(won),n0(wonQ.length)+' ใบ · รวม VAT','good',go('quotes'))));
+  // ต้องทำตอนนี้
+  const td=today();
+  const todo=[
+    [S.po.filter(p=>p.appr&&p.appr.st==='pending').length,'⏳','ใบสั่งซื้อรออนุมัติ','กดเพื่อไปที่ใบที่รออนุมัติ','',go('po',()=>{ poF='all'; poA='pending'; })],
+    [low.length,'⚠️','วัสดุต่ำกว่าจุดสั่งซื้อ','ควรสั่งเพิ่ม','bad',go('lowstock')],
+    [wds.filter(w=>w.status==='requested').length,'🧾','ใบเบิกรอยืนยัน (จาก LINE)','ตรวจและยืนยันตัดสต๊อก','',go('withdrawals')],
+    [S.ja.filter(a=>a.status!=='done'&&a.end&&a.end<td).length,'🚨','งานเลยกำหนดส่ง','มอบหมายงานที่เกินกำหนด','bad',go('ja')],
+    [S.quotes.filter(q=>q.status==='sent').length,'📨','ใบเสนอราคาที่ส่งแล้ว รอผล','ติดตามลูกค้า','info',go('quotes')],
+    [poOpen.filter(p=>!(p.appr&&p.appr.st)).length,'📝','ใบสั่งซื้อยังไม่ขออนุมัติ','ส่งขออนุมัติเพื่อสั่งซื้อ','info',go('po',()=>{ poF='open'; poA='none'; })]
+  ].filter(x=>x[0]>0);
+  const cTodo=h('div',{class:'card hm-card'},h('h2',null,'🎯 ต้องทำตอนนี้'));
+  if(!todo.length) cTodo.append(h('div',{class:'hint'},'ไม่มีงานค้าง 🎉'));
+  todo.forEach(([n,ic,t,sub,tone,fn])=>cTodo.append(h('div',{class:'todo '+tone,onclick:fn},h('div',{class:'tic'},ic),h('div',null,h('b',null,t),h('small',null,sub)),h('div',{class:'n'},n0(n)))));
+  // pipeline
+  const seg=(items,total)=>{ const bar=h('div',{class:'seg'}); const lg=h('div',{class:'lg'}); items.forEach(([t,n,c])=>{ if(n>0) bar.append(h('i',{style:'width:'+(n/Math.max(1,total)*100)+'%;background:'+c})); lg.append(h('span',{style:'--c:'+c},t+' '+n0(n))); }); return [bar,lg]; };
+  const cPipe=h('div',{class:'card hm-card'},h('h2',null,'📊 สถานะงานสั่งซื้อและขาย'));
+  const poC=k=>S.po.filter(p=>p.status===k).length;
+  cPipe.append(h('div',{style:'font-size:13px;color:var(--muted)'},'ใบสั่งซื้อ '+n0(S.po.length)+' ใบ'),...seg([['ร่าง',poC('draft'),'#94a3b8'],['สั่งซื้อแล้ว',poC('sent'),'#f59e0b'],['รับบางส่วน',poC('partial'),'#38bdf8'],['รับครบ',poC('received'),'#22c55e'],['ยกเลิก',poC('cancelled'),'#ef4444']],S.po.length));
+  const qC=k=>S.quotes.filter(q=>(q.status||'draft')===k).length;
+  cPipe.append(h('div',{style:'font-size:13px;color:var(--muted)'},'ใบเสนอราคา '+n0(S.quotes.length)+' ใบ'),...seg([['ร่าง',qC('draft'),'#94a3b8'],['ส่งแล้ว',qC('sent'),'#f59e0b'],['ได้งาน',qC('won'),'#22c55e'],['ไม่ได้งาน',qC('lost'),'#ef4444']],S.quotes.length));
+  const ap=S.po.filter(p=>p.appr&&p.appr.st); const apC=k=>S.po.filter(p=>p.appr&&p.appr.st===k).length;
+  if(ap.length) cPipe.append(h('div',{style:'font-size:13px;color:var(--muted)'},'การอนุมัติใบสั่งซื้อ'),...seg([['อนุมัติแล้ว',apC('approved'),'#22c55e'],['รออนุมัติ',apC('pending'),'#f59e0b'],['ไม่อนุมัติ',apC('rejected'),'#ef4444']],ap.length));
+  el.append(h('div',{class:'hm-grid'},cTodo,cPipe));
+  // low stock + withdrawals
+  const c1=h('div',{class:'card hm-card'},h('h2',null,'🔻 วัสดุที่ต้องสั่งเพิ่ม',low.length?h('span',{class:'more',onclick:go('lowstock')},'ดูทั้งหมด ('+low.length+') ›'):null));
   if(!low.length) c1.append(h('div',{class:'hint'},S.items.length?'ยังไม่มีรายการที่ต่ำกว่าจุดสั่งซื้อ':'ยังไม่มีวัสดุ เริ่มจากเพิ่มที่เมนู "วัสดุ / สินค้า"'));
-  else c1.append(h('div',{class:'tablewrap'},h('table',null,h('tr',null,h('th',null,'รายการ'),h('th',{class:'num'},'คงเหลือ'),h('th',{class:'num'},'จุดสั่งซื้อ')),
-    low.slice(0,10).map(i=>h('tr',null,h('td',null,i.name),h('td',{class:'num'},n0(i.stock)+' '+(i.unit||'')),h('td',{class:'num'},n0(i.min)))))));
-  const c2=h('div',{class:'card'},h('h2',null,'เบิกล่าสุด'));
-  const ws=[...vwd()].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.no||'').localeCompare(a.no||'')).slice(0,6);
+  else [...low].sort((a,b)=>num(a.stock)/num(a.min)-num(b.stock)/num(b.min)).slice(0,8).forEach(i=>{ const pct=Math.max(2,Math.min(100,num(i.stock)/num(i.min)*100)); c1.append(h('div',{class:'lw'},h('div',{class:'nm',title:i.name},(i.code?i.code+' · ':'')+i.name),h('div',{class:'q'},n0(i.stock)+' / '+n0(i.min)+' '+(i.unit||'')),h('div',{class:'bar2'},h('i',{style:'width:'+pct+'%'})))); });
+  const c2=h('div',{class:'card hm-card'},h('h2',null,'🕘 เบิกล่าสุด',wds.length?h('span',{class:'more',onclick:go('withdrawals')},'ดูทั้งหมด ›'):null));
+  const ws=[...wds].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.no||'').localeCompare(a.no||'')).slice(0,7);
   if(!ws.length) c2.append(h('div',{class:'hint'},'ยังไม่มีรายการเบิก'));
-  else c2.append(h('div',{class:'tablewrap'},h('table',null,h('tr',null,h('th',null,'เลขที่'),h('th',null,'งาน'),h('th',null,'วันที่')),
-    ws.map(w=>h('tr',null,h('td',{class:'mono'},w.no),h('td',null,w.job||'-'),h('td',null,thDate(w.date)))))));
-  cols.append(c1,c2); el.append(cols);
+  else c2.append(h('div',{class:'tl'},ws.map(w=>h('div',{class:'it'},h('b',null,w.no||''),' ',h('span',null,w.job||'-'),h('small',null,thDate(w.date)+(w.requester?' · '+w.requester:'')+' · '+(w.lines||[]).length+' รายการ')))));
+  el.append(h('div',{class:'hm-grid'},c1,c2));
   if(pOn('home','activity')) el.append(activityCard());
   if(window.JOBS&&!S.jobs.length&&!db) el.append(h('div',{class:'card',style:'margin-top:14px;border-color:var(--accent)'},h('h2',null,'มีงานที่เคยทำพร้อมนำเข้า'),h('p',null,`ใบประมาณราคาเก่า ${window.JOBS.length} งาน ใช้เป็นแม่แบบได้`),h('button',{class:'btn primary',onclick:()=>{view='jobs';render();}},'ไปที่งานที่เคยทำ')));
   if(!S.items.length&&window.SEED&&!db) el.append(h('div',{class:'card',style:'margin-top:14px;border-color:var(--accent)'},h('h2',null,'มีฐานข้อมูลตั้งต้นพร้อมนำเข้า'),h('p',null,`วัสดุและราคา ${n0(window.SEED.items.length)} รายการ จากไฟล์ที่คุณให้มา`),h('button',{class:'btn primary',onclick:seedModal},'นำเข้าตอนนี้')));
