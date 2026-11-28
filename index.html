@@ -3228,31 +3228,50 @@ function opsCard(){
       }),
       h('button',{class:'btn small',style:'align-self:center',onclick:async()=>{ const nm=(await askName('ชื่อตำแหน่งใหม่ เช่น ฝ่ายจัดซื้อ / ฝ่ายคลัง'))||''; const t=nm.trim(); if(!t) return; if(pm[t]){ toast('มีตำแหน่งนี้แล้ว'); return; } if(await savePos({...pm,[t]:{buy:false}})){ drawPos(); drawMx(); } }},'+ เพิ่มตำแหน่ง'))); }
   drawPos();
+  let mxSel=null;
+  function paintMx(){
+    if(!TEAM.length){ mx.replaceChildren(h('div',{class:'hint',style:'padding:8px'},'ไม่พบรายชื่อผู้ใช้')); return; }
+    if(!mxSel||!TEAM.some(u=>u.id===mxSel)) mxSel=TEAM[0].id;
+    const isAdm=u=>{ const lk=mxLinks.get(u.id); return !!(lk&&lk.role==='admin')||!!(CU&&u.id===CU.id&&isAdmin()); };
+    const chip=(t,c)=>h('span',{class:'pill '+(c||'mute'),style:'font-size:11px;padding:1px 7px'},t);
+    const leadersNow=TEAM.filter(u=>idsOf('leaders').includes(u.id));
+    const list=h('div',{style:'display:flex;flex-direction:column;gap:6px;flex:0 0 230px;min-width:200px'},...TEAM.map(u=>{ const lk=mxLinks.get(u.id), adm=isAdm(u), sel=u.id===mxSel, pos=posOfMap()[u.id];
+      return h('button',{class:'btn','aria-pressed':sel?'true':'false',style:'text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:8px 10px;height:auto;'+(sel?'border-color:#0f6e84;background:#e8f3f6;box-shadow:inset 3px 0 0 #0f6e84':''),onclick:()=>{ mxSel=u.id; paintMx(); }},
+        h('b',null,u.name),
+        h('span',{style:'display:flex;flex-wrap:wrap;gap:4px'},adm?chip('แอดมิน','good'):null,(lk||adm)?chip('LINE ✓','good'):chip('ยังไม่ผูก LINE'),pos?chip(pos):null,idsOf('leaders').includes(u.id)?chip('หัวหน้าทีม'):null)); }));
+    const u=TEAM.find(x=>x.id===mxSel), lk=mxLinks.get(u.id), adm=isAdm(u), noL=!lk&&!adm;
+    const sw=(label,desc,on,fn,dis)=>h('label',{style:'display:flex;gap:10px;align-items:flex-start;padding:7px 0;cursor:'+(dis?'default':'pointer')+';opacity:'+(dis?'.55':'1')},
+      h('input',{type:'checkbox',checked:!!on,disabled:!!dis,style:'margin-top:3px',onchange:e=>fn(e.target.checked)}),
+      h('span',null,h('div',{style:'font-weight:600'},label),desc?h('div',{class:'hint'},desc):null));
+    const sec=(title,hint,...rows)=>h('div',{style:'border:1px solid var(--line,#d6dde3);border-radius:12px;padding:10px 14px;margin-bottom:10px'},h('div',{style:'font-weight:700;margin-bottom:2px'},title),hint?h('div',{class:'hint',style:'margin-bottom:4px'},hint):null,...rows);
+    const row=(label,ctl)=>h('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0'},h('span',{style:'min-width:140px;font-weight:600'},label),ctl);
+    const posSel=h('select',{style:'width:auto','aria-label':'ตำแหน่งของ '+u.name,onchange:async e=>{ const po={...posOfMap()}; if(e.target.value) po[u.id]=e.target.value; else delete po[u.id]; if(await savePos(null,po)){ toast('บันทึกตำแหน่งแล้ว'); paintMx(); } }},h('option',{value:''},'— ไม่ระบุ —'),...Object.keys(posMap()).map(n=>h('option',{value:n,selected:posOfMap()[u.id]===n},n)));
+    const myPos=posOfMap()[u.id], buyOn=!!(myPos&&(posMap()[myPos]||{}).buy);
+    const isLead=idsOf('leaders').includes(u.id);
+    const teamSel=isLead?h('span',{class:'hint'},'เป็นหัวหน้าทีมเอง'):h('select',{style:'width:auto','aria-label':'หัวหน้าของ '+u.name,onchange:async e=>{ const m={...((S.settings||{}).leaderOf||{})}; if(e.target.value) m[u.id]=e.target.value; else delete m[u.id]; if(await putSettings({...S.settings,leaderOf:m})) toast('บันทึกทีมแล้ว'); }},h('option',{value:''},'— ไม่มีหัวหน้า —'),...leadersNow.map(l=>h('option',{value:l.id,selected:((S.settings||{}).leaderOf||{})[u.id]===l.id},l.name)));
+    const srchSel=adm?h('span',{class:'hint'},'แอดมิน — ดูยอด + ราคาได้ทั้งหมด'):h('select',{style:'width:auto',disabled:noL,'aria-label':'สิทธิ์ค้นหาสินค้า '+u.name,onchange:async e=>{ const {error}=await SB.rpc('admin_line_set_perm',{p_user:u.id,p_perm:e.target.value}); if(!error&&lk) lk.stock_perm=e.target.value; toast(error?'ไม่สำเร็จ: '+errMsg(error):'บันทึกสิทธิ์แล้ว'); }},...[['none','ไม่ให้ใช้คำสั่งค้นหา'],['qty','ดูยอดคงเหลือ (ไม่เห็นราคา)'],['full','ดูยอด + ราคา']].map(([v,t])=>h('option',{value:v,selected:(lk?lk.stock_perm:'none')===v},t)));
+    const head=h('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px'},h('h3',{style:'margin:0;font-size:18px'},u.name),adm?chip('แอดมิน','good'):null,(lk||adm)?chip('ผูก LINE แล้ว','good'):chip('ยังไม่ผูก LINE'));
+    const detail=h('div',{style:'flex:1;min-width:280px'},head,
+      noL?h('div',{class:'hint',style:'background:#fff6e5;border:1px solid #f0d9a8;border-radius:8px;padding:8px 10px;margin-bottom:10px'},'คนนี้ยังไม่ได้ผูก LINE — ให้เขากดเมนู "🔔 ผูก LINE" ในแอปก่อน จึงจะตั้งสิทธิ์ที่ใช้ LINE ได้ (ส่วนที่เทา)'):null,
+      sec('ตำแหน่งและทีม',null,row('ตำแหน่งงาน',posSel),
+        buyOn?h('div',{class:'hint',style:'margin:-2px 0 4px 150px'},'🔔 ตำแหน่งนี้ได้รับแจ้งเตือน LINE + PDF เมื่อมีใบสั่งซื้อ/ขอซื้อ'):null,
+        sw('เป็นหัวหน้าทีม','เห็นงานของลูกทีมและได้รับสรุปงานของทีม',isLead,async on=>{ if(await setIds('leaders',u.id,on)){ toast('บันทึกหัวหน้าทีมแล้ว'); paintMx(); } }),
+        isLead?null:row('อยู่ทีมของ',teamSel)),
+      sec('สิ่งที่ใช้ได้ทาง LINE',adm?'แอดมินใช้ได้ทุกอย่างเสมอ':'เปิด/ปิดคำสั่งในแชท LINE OA ของคนนี้',
+        row('ค้นหาสินค้า',srchSel),
+        ...LFEAT.map(([k,t])=>sw(t,null,adm||!offOf(u.id).includes(k),async on=>{ const m={...((S.settings||{}).lineOff||{})}; const cur=new Set(offOf(u.id)); if(on) cur.delete(k); else cur.add(k); m[u.id]=[...cur]; if(await putSettings({...S.settings,lineOff:m})) toast('บันทึกแล้ว'); },adm||noL))),
+      sec('หน้าที่และการแจ้งเตือน',null,
+        sw('อัปเดตสต๊อกจากไฟล์ Express (ทาง LINE)','ส่งไฟล์ Excel/CSV ในแชทเพื่ออัปเดตยอดและต้นทุน',adm||idsOf('stockUpdaters').includes(u.id),async on=>{ if(await setIds('stockUpdaters',u.id,on)) toast('บันทึกแล้ว'); },adm||noL),
+        sw('ผู้อนุมัติใบเบิก / ใบสั่งซื้อ','ได้รับการ์ดขออนุมัติใน LINE พร้อมปุ่ม อนุมัติ / ไม่อนุมัติ',adm||idsOf('approvers').includes(u.id),async on=>{ if(await setIds('approvers',u.id,on)) toast('บันทึกผู้อนุมัติแล้ว'); },adm||noL),
+        sw('รับแจ้งเตือนสินค้าใกล้หมด','ได้รับสรุปสินค้าต่ำกว่าขั้นต่ำทุกวัน (ไม่ติ๊กใครเลย = ส่งให้แอดมิน)',idsOf('lowStockUsers').includes(u.id),async on=>{ if(await setIds('lowStockUsers',u.id,on)) toast('บันทึกแล้ว'); },noL)));
+    mx.replaceChildren(h('div',{style:'display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start'},list,detail));
+  }
   async function drawMx(force){ if(!online) return;
     mx.replaceChildren(h('div',{class:'hint',style:'padding:8px'},'กำลังโหลดรายชื่อ…'));
     if(force||!TEAM.length||!_teamLoaded) await loadTeam();
     const {data,error}=await SB.rpc('admin_line_links'); if(error){ mx.textContent='โหลดไม่ได้: '+errMsg(error); return; }
     mxLinks=new Map((data||[]).map(x=>[x.user_id,x]));
-    if(!TEAM.length){ mx.replaceChildren(h('div',{class:'hint',style:'padding:8px'},'ไม่พบรายชื่อผู้ใช้')); return; }
-    const cb=(on,fn,dis,title)=>h('input',{type:'checkbox',checked:!!on,disabled:!!dis,title:title||'',onchange:e=>fn(e.target.checked)});
-    const th=t=>h('th',{style:'white-space:nowrap;font-size:12px'},t);
-    const leadersNow=TEAM.filter(u=>idsOf('leaders').includes(u.id));
-    const rows=TEAM.map(u=>{ const lk=mxLinks.get(u.id), adm=!!(lk&&lk.role==='admin')||(CU&&u.id===CU.id&&isAdmin()), noL=!lk&&!adm;
-      const td=(...c)=>h('td',{style:'text-align:center'},...c);
-      const srch=adm?h('span',{class:'hint'},'ทั้งหมด'):h('select',{style:'width:auto;padding:2px 6px',disabled:noL,'aria-label':'สิทธิ์ค้นหาสินค้า '+u.name,onchange:async e=>{ const {error}=await SB.rpc('admin_line_set_perm',{p_user:u.id,p_perm:e.target.value}); toast(error?'ไม่สำเร็จ: '+errMsg(error):'บันทึกสิทธิ์แล้ว'); }},...[['none','ไม่ให้'],['qty','ดูยอด'],['full','ดูยอด+ราคา']].map(([v,t])=>h('option',{value:v,selected:(lk?lk.stock_perm:'none')===v},t)));
-      const team=adm||idsOf('leaders').includes(u.id)?h('span',{class:'hint'},adm?'—':'(หัวหน้า)'):h('select',{style:'width:auto;padding:2px 6px','aria-label':'หัวหน้าของ '+u.name,onchange:async e=>{ const m={...((S.settings||{}).leaderOf||{})}; if(e.target.value) m[u.id]=e.target.value; else delete m[u.id]; if(await putSettings({...S.settings,leaderOf:m})) toast('บันทึกทีมแล้ว'); }},h('option',{value:''},'— ไม่มี —'),...leadersNow.map(l=>h('option',{value:l.id,selected:((S.settings||{}).leaderOf||{})[u.id]===l.id},l.name)));
-      const feat=LFEAT.map(([k,t])=>td(adm?h('span',{class:'hint'},'✓'):cb(!offOf(u.id).includes(k),async on=>{ const m={...((S.settings||{}).lineOff||{})}; const cur=new Set(offOf(u.id)); if(on) cur.delete(k); else cur.add(k); m[u.id]=[...cur]; if(await putSettings({...S.settings,lineOff:m})) toast('บันทึกแล้ว'); },noL,t)));
-      return h('tr',null,h('td',{style:'white-space:nowrap;font-weight:600'},u.name),
-        td(adm?h('span',{class:'pill good'},'แอดมิน'):lk?h('span',{class:'pill good'},'ผูกแล้ว'):h('span',{class:'pill mute'},'ยังไม่ผูก')),
-        td(h('select',{style:'width:auto;padding:2px 6px','aria-label':'ตำแหน่งของ '+u.name,onchange:async e=>{ const po={...posOfMap()}; if(e.target.value) po[u.id]=e.target.value; else delete po[u.id]; if(await savePos(null,po)) toast('บันทึกตำแหน่งแล้ว'); }},h('option',{value:''},'— ไม่ระบุ —'),...Object.keys(posMap()).map(n=>h('option',{value:n,selected:posOfMap()[u.id]===n},n)))),
-        td(srch),
-        td(cb(idsOf('leaders').includes(u.id),async on=>{ if(await setIds('leaders',u.id,on)){ toast('บันทึกหัวหน้าทีมแล้ว'); drawMx(); } })),
-        td(team),
-        td(adm?h('span',{class:'hint'},'✓'):cb(idsOf('stockUpdaters').includes(u.id),async on=>{ if(await setIds('stockUpdaters',u.id,on)) toast('บันทึกแล้ว'); },noL)),
-        td(adm?h('span',{class:'hint'},'✓'):cb(idsOf('approvers').includes(u.id),async on=>{ if(await setIds('approvers',u.id,on)) toast('บันทึกผู้อนุมัติแล้ว'); },noL)),
-        td(cb(idsOf('lowStockUsers').includes(u.id),async on=>{ if(await setIds('lowStockUsers',u.id,on)) toast('บันทึกแล้ว'); },noL)),
-        ...feat); });
-    mx.replaceChildren(h('table',null,h('thead',null,h('tr',null,th('ผู้ใช้'),th('LINE'),th('ตำแหน่ง'),th('ค้นหาสินค้า'),th('หัวหน้าทีม'),th('อยู่ทีมของ'),th('อัพเดทสต๊อก'),th('อนุมัติ'),th('แจ้งของใกล้หมด'),...LFEAT.map(([k,t])=>th(t)))),h('tbody',null,...rows))); }
+    paintMx(); }
   drawMx(true);
   const lineRes=h('div',{class:'hint'});
   return h('div',{class:'card',style:'margin-bottom:14px'},h('b',null,'สำรองข้อมูล · Audit · แจ้งเตือน LINE (ผู้ดูแล)'),
@@ -3263,7 +3282,7 @@ function opsCard(){
     h('div',{style:'margin-top:8px'},snapBox),
     online?h('div',{style:'margin-top:12px;border-top:1px solid var(--line);padding-top:10px'},
       h('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},h('input',{type:'checkbox',checked:S.settings.lineOn!==false,onchange:async e=>{ if(await putSettings({...S.settings,lineOn:e.target.checked})) toast(e.target.checked?'เปิดแจ้งเตือน LINE':'ปิดแจ้งเตือน LINE'); }}),'แจ้งเตือน LINE รายคน เมื่อมอบหมายงานใหม่ / งานเสร็จ'),
-      h('div',{style:'margin:10px 0 6px'},h('b',null,'👥 สิทธิ์และการแจ้งเตือนรายคน'),h('div',{class:'hint'},'หนึ่งแถวต่อหนึ่งคน · เปลี่ยนแล้วบันทึกทันที · คนที่ยังไม่ผูก LINE จะตั้งสิทธิ์ที่ต้องใช้ LINE ไม่ได้ (ให้เขากด "🔔 ผูก LINE" ในแอปก่อน) · เพิ่มผู้ใช้ใหม่แล้วกด "รีเฟรชรายชื่อ"'),h('button',{class:'btn small',style:'margin:4px 0',onclick:()=>drawMx(true)},'รีเฟรชรายชื่อ'),posBox,mx),
+      h('div',{style:'margin:10px 0 6px'},h('b',null,'👥 สิทธิ์และการแจ้งเตือนรายคน'),h('div',{class:'hint'},'เลือกคนทางซ้าย แล้วตั้งค่าของคนนั้นทางขวา · เปลี่ยนแล้วบันทึกทันที · เพิ่มผู้ใช้ใหม่แล้วกด "รีเฟรชรายชื่อ"'),h('button',{class:'btn small',style:'margin:4px 0 8px',onclick:()=>drawMx(true)},'รีเฟรชรายชื่อ'),mx,h('details',{style:'margin-top:10px'},h('summary',{style:'cursor:pointer;font-weight:600'},'⚙ จัดการตำแหน่งงาน (เพิ่ม/ลบ/เปิดแจ้งเตือนขอซื้อ)'),posBox)),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'🗓 สรุปงานทาง LINE (ส่งอัตโนมัติ 08:00)'),dgOpt('daily',true,'สรุปงานประจำวัน (ทุกวัน)'),dgOpt('weekly',true,'สรุปงานประจำสัปดาห์ (ทุกวันจันทร์)'),dgOpt('self',false,'ส่งสรุปงานของตัวเองให้ลูกทีมแต่ละคนด้วย')),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'✅ ผู้อนุมัติใบเบิก / ใบสั่งซื้อ (ทาง LINE)'),h('div',{class:'hint'},'ผู้อนุมัติเลือกในตารางด้านบน (admin อนุมัติได้เสมอ) — คนขอกด "ส่งขออนุมัติ" แล้วผู้อนุมัติจะได้การ์ดใน LINE พร้อมปุ่ม อนุมัติ / ไม่อนุมัติ · ใบเบิกที่สร้างจาก LINE ส่งขออนุมัติให้อัตโนมัติ'),arOpt('po','บังคับต้องอนุมัติก่อนเปลี่ยนสถานะใบสั่งซื้อเป็น "สั่งซื้อแล้ว"'),arOpt('wd','บังคับต้องอนุมัติก่อนยืนยันเบิก (ใบเบิกที่สร้างจาก LINE)')),
       h('div',{style:'margin:10px 0 6px'},h('b',null,'📦 ผู้รับแจ้งเตือนสินค้าใกล้หมด (LINE)'),h('div',{class:'hint'},'ติ๊กคนที่จะได้รับข้อความเมื่อสินค้าต่ำกว่าขั้นต่ำ (ตั้งขั้นต่ำที่ปุ่ม "ขั้นต่ำ" ในหน้าสินค้า) · ไม่ติ๊กใคร = ส่งให้แอดมิน · ต้องผูก LINE แล้ว'),h('div',{style:'display:flex;gap:8px;align-items:center;margin:4px 0'},h('span',null,'เวลาแจ้งเตือน (วันละครั้ง):'),h('select',{style:'width:auto','aria-label':'เวลาแจ้งเตือนสินค้าใกล้หมด',onchange:async e=>{ if(await putSettings({...S.settings,lowAlertHour:+e.target.value})) toast('ตั้งเวลาแจ้งเตือน '+String(e.target.value).padStart(2,'0')+':00 แล้ว'); }},...Array.from({length:24},(_,i)=>h('option',{value:i,selected:i===(Number.isInteger(+(S.settings||{}).lowAlertHour)&&(S.settings||{}).lowAlertHour!==''&&(S.settings||{}).lowAlertHour!=null?+S.settings.lowAlertHour:8)},String(i).padStart(2,'0')+':00 น.'))),h('span',{class:'hint'},'สินค้าที่ต่ำกว่าขั้นต่ำเพิ่มระหว่างวัน จะรวมในการแจ้งเตือนรอบถัดไปตามเวลานี้')),lsu),
