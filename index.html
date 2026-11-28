@@ -2910,7 +2910,7 @@ function tPo(p){ const L0=p.lines||[]; const sp=(l)=>String(l.sup||(!String(p.su
   return {name:'ใบขอซื้อ '+p.no,title:'ใบขอซื้อ '+p.no,meta,head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]],extra,html:poFormHtml(p,L,sp,sm,cmp,save,over)}; }
 function poFormHtml(p,L,sp,sm,cmp,save,over){
   const g=new Map(); L.forEach(l=>{ const k=sp(l)||'ไม่ระบุร้าน'; (g.get(k)||g.set(k,[]).get(k)).push(l); });
-  const multi=g.size>1, RH=6.6, LH=4.5, BUD=198, CPL=46;
+  const multi=g.size>1, RH=6.6, LH=4.5, BUD=204, CPL=46;
   const rowH=l=>{ const n=Math.max(1,Math.ceil(String((l.code?l.code+'  ':'')+(l.name||'')).length/CPL)); return Math.max(RH,n*LH+2.1); };
   const cell=(h,cls,t,st)=>`<td class="${cls||''}"${st?` style="${st}"`:''}><div class="k" style="height:${(h-0.5).toFixed(2)}mm">${t}</div></td>`;
   const pages=[{rows:[],used:0}]; let curSup='', no=0;
@@ -2938,7 +2938,7 @@ function poFormHtml(p,L,sp,sm,cmp,save,over){
   return `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>ใบขอซื้อ ${esc(p.no||'')}</title><style>
 @page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{font:12px/1.3 Tahoma,'Leelawadee UI','Noto Sans Thai',sans-serif;color:#111;margin:0}
 .pg{height:280mm;overflow:hidden;page-break-after:always}.pg:last-child{page-break-after:auto}
-.box{border:2px solid #111;height:280mm;overflow:hidden}
+.box{border:2px solid #111;height:280mm;overflow:hidden;display:flex;flex-direction:column}
 h1{font-size:17px;text-align:center;margin:0;height:11mm;line-height:11mm;border-bottom:1.5px solid #111}
 .hd{display:grid;grid-template-columns:repeat(3,1fr);gap:2mm 3mm;padding:2mm 3mm;height:24mm;border-bottom:1.5px solid #111;align-content:start}
 .f{display:flex;gap:4px;border-bottom:1px solid #aaa;height:5.5mm;overflow:hidden}.f b{white-space:nowrap}.f b.rq{color:#d91a1a}.f span{flex:1;white-space:nowrap;overflow:hidden}
@@ -2947,7 +2947,7 @@ table.m tr>:first-child{border-left:0}table.m tr>:last-child{border-right:0}
 .k{overflow:hidden;padding:0.6mm 1.5mm;line-height:${LH}mm}.c{text-align:center}.r{text-align:right}
 tr.sup td{background:#e0eaf1;color:#0f6e84}tr.sup span{float:right;color:#777;font-size:11px}
 tr.st td{font-weight:700;color:#444}.big{font-size:13px;color:#111}th.rd{color:#d91a1a}
-.sgs{display:grid;grid-template-columns:repeat(4,1fr);border-top:1.5px solid #111;height:26mm}
+.sgs{margin-top:auto;flex:none;display:grid;grid-template-columns:repeat(4,1fr);border-top:1.5px solid #111;height:26mm}
 .sg{border-left:1px solid #111;text-align:center;padding-top:2mm;position:relative}.sg:first-child{border-left:0}.sg small{display:block;color:#666}.sg .dt{position:absolute;left:6px;bottom:5px;font-size:11px}
 .ap-pg{page-break-before:always;padding:4px}h3{font-size:13px;margin:12px 0 4px;color:#0f6e84}.hn{font-size:10px;color:#777;margin-bottom:4px}
 table.ap{width:100%;border-collapse:collapse}table.ap th,table.ap td{border-bottom:1px solid #ccc;padding:3px 5px}table.ap th{background:#e0eaf1;text-align:left}tr.ch td{background:#e0eaf1;font-weight:700}
