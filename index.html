@@ -2857,29 +2857,50 @@ const NO_SUP='(ยังไม่ระบุร้าน)';
 function bestSup(it){ const s=((it&&it.suppliers)||[]).filter(x=>num(x.price)>0).sort((a,b)=>num(a.price)-num(b.price))[0]; return s?{name:s.name||NO_SUP,price:num(s.price)}:{name:NO_SUP,price:num(it&&it.cost)}; }
 const poTotal=p=>(p.lines||[]).reduce((a,l)=>a+num(l.qty)*num(l.price),0);
 async function poCreate(lines,job,note){
-  const g=new Map();
+  /* ใบเดียวจบ: รวมทุกร้านไว้ในใบสั่งซื้อเดียว (แต่ละรายการระบุร้านของตัวเอง) */
+  const ls=[];
   lines.forEach(l=>{ const it=l.itemId?S.items.find(i=>i.id===l.itemId):null; const b=it?bestSup(it):{name:NO_SUP,price:num(l.cost)};
-    const a=g.get(b.name)||g.set(b.name,[]).get(b.name); const ex=l.itemId&&a.find(x=>x.itemId===l.itemId);
+    const ex=l.itemId&&ls.find(x=>x.itemId===l.itemId);
     if(ex){ ex.qty=+(ex.qty+num(l.qty)).toFixed(4); return; }
-    a.push({k:uid(),itemId:l.itemId||'',code:l.code||(it&&it.code)||'',name:l.name||(it&&it.name)||'',unit:l.unit||(it&&it.unit)||'',qty:num(l.qty),price:b.price,recv:0,sup:b.name===NO_SUP?'':b.name}); });
-  const made=[]; const all=[...S.po]; const pre=S.settings.poPrefix||'PO';
-  for(const [sup,ls] of g){
-    const no=await freshNo(pre,all,nextNo(pre,all));
-    const rec={no,date:today(),supplier:sup===NO_SUP?'':sup,status:'draft',lines:ls,job:job||'',note:note||'',by:logBy()}; const id=uid();
-    if(await put('po',id,rec)){ all.push({...rec,id}); made.push({...rec,id}); purchNotify('po',id); }
-  }
-  return made;
+    ls.push({k:uid(),itemId:l.itemId||'',code:l.code||(it&&it.code)||'',name:l.name||(it&&it.name)||'',unit:l.unit||(it&&it.unit)||'',qty:num(l.qty),price:b.price,recv:0,sup:b.name===NO_SUP?'':b.name}); });
+  if(!ls.length) return [];
+  ls.sort((a,b)=>String(a.sup||'￿').localeCompare(String(b.sup||'￿'),'th'));
+  const pre=S.settings.poPrefix||'PO'; const all=[...S.po];
+  const no=await freshNo(pre,all,nextNo(pre,all));
+  const rec={no,date:today(),supplier:poSupNames(ls),status:'draft',lines:ls,job:job||'',note:note||'',by:logBy()}; const id=uid();
+  if(await put('po',id,rec)){ purchNotify('po',id); return [{...rec,id}]; }
+  return [];
+}
+const poSupNames=ls=>[...new Set((ls||[]).map(l=>String(l.sup||'').trim()).filter(Boolean))].join(', ');
+/* เทียบราคา: รายการที่มีหลายร้านที่มีราคา */
+function poCompare(p){
+  const out=[];
+  (p.lines||[]).forEach(l=>{ const it=l.itemId&&S.items.find(i=>i.id===l.itemId); if(!it) return;
+    const m=new Map(); (it.suppliers||[]).forEach(s=>{ const pr=num(s.price); if(s.name&&pr>0&&(!m.has(s.name)||pr<m.get(s.name))) m.set(s.name,pr); });
+    if(m.size<2) return; const offers=[...m].map(([name,price])=>({name,price})).sort((a,b)=>a.price-b.price);
+    out.push({l,offers}); });
+  return out;
 }
 const buyQtyOf=i=>num(i.buyQty)>0?num(i.buyQty):Math.max(1,num(i.min)*2-num(i.stock));
 async function poFromLow(){
   const low=S.items.filter(i=>num(i.min)>0&&num(i.stock)<=num(i.min));
   if(!low.length){ toast('ไม่มีของใกล้หมด'); return; }
-  if(!await ask('สร้างใบสั่งซื้อจากของใกล้หมด '+low.length+' รายการ? (แยกตามร้านที่ราคาต่ำสุด สั่งให้ถึง 2 เท่าของจุดสั่งซื้อ)')) return;
+  if(!await ask('สร้างใบสั่งซื้อจากของใกล้หมด '+low.length+' รายการ? (รวมเป็นใบเดียว เลือกร้านราคาต่ำสุดให้แต่ละรายการ พร้อมตารางเทียบราคา)')) return;
   const made=await poCreate(low.map(i=>({itemId:i.id,qty:buyQtyOf(i)})),'','สร้างจากของใกล้หมด');
-  toast('สร้างใบสั่งซื้อ '+made.length+' ใบ'); view='po'; render();
+  toast('สร้างใบสั่งซื้อแล้ว (ใบเดียว '+low.length+' รายการ)'); view='po'; render();
 }
 let poF='open';
-function tPo(p){ const L=p.lines||[]; return {name:'ใบสั่งซื้อ '+p.no,title:'ใบสั่งซื้อ '+p.no,meta:[['วันที่',thDate(p.date)],['ผู้ขาย',p.supplier||'-'],['อ้างอิงงาน',p.job||'-'],['สถานะ',(PO_ST[p.status]||[''])[0]]],head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows:L.map((l,i)=>[i+1,l.code||'',l.name||'',l.sup||p.supplier||'',num(l.qty),l.unit||'',num(l.price),num(l.qty)*num(l.price)]),foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]]}; }
+function tPo(p){ const L=p.lines||[]; const pr=(k,t)=>{ const r=['',t,'','','','','','']; r[k]=true; return r; }; const sm=new Map(); L.forEach(l=>{ const k=String(l.sup||p.supplier||'ไม่ระบุร้าน'); const a=sm.get(k)||{n:0,t:0}; a.n++; a.t+=num(l.qty)*num(l.price); sm.set(k,a); });
+  const rows=[]; L.forEach((l,i)=>rows.push([i+1,l.code||'',l.name||'',l.sup||p.supplier||'',num(l.qty),l.unit||'',num(l.price),num(l.qty)*num(l.price)]));
+  const cmp=poCompare(p); let save=0;
+  if(sm.size>1){ rows.push(pr('sec','สรุปยอดแยกตามร้าน')); [...sm].forEach(([k,a])=>rows.push(['','',k+' ('+a.n+' รายการ)','','','','',a.t])); }
+  if(cmp.length){ rows.push(pr('sec','เปรียบเทียบราคา (รายการที่มีหลายร้าน) — ✓ = ร้านที่เลือก'));
+    cmp.forEach(c=>{ const hi=c.offers[c.offers.length-1].price, cur=num(c.l.price); const ch=String(c.l.sup||'');
+      save+=Math.max(0,(hi-cur)*num(c.l.qty));
+      rows.push(pr('sub',(c.l.code?c.l.code+' ':'')+(c.l.name||'')+'  (สั่ง '+n0(c.l.qty)+' '+(c.l.unit||'')+')'));
+      c.offers.forEach((o,j)=>rows.push(['','',(o.name===ch?'✓ ':'')+o.name+(j===0?'  [ถูกสุด]':''),'','',c.l.unit||'',o.price,o.price*num(c.l.qty)])); });
+    if(save>0) rows.push(pr('sub','สั่งตามร้านที่เลือก ประหยัดกว่าร้านราคาสูงสุด รวม '+n2(save)+' บาท')); }
+  return {name:'ใบสั่งซื้อ '+p.no,title:'ใบสั่งซื้อ '+p.no,meta:[['วันที่',thDate(p.date)],['ผู้ขาย',poSupNames(L)||p.supplier||'-'],['อ้างอิงงาน',p.job||'-'],['สถานะ',(PO_ST[p.status]||[''])[0]]],head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]]}; }
 function tPoList(){ return {name:'ใบสั่งซื้อ '+nowStamp(),title:'รายการใบสั่งซื้อ',head:['เลขที่','วันที่','ผู้ขาย','งาน','รายการ','มูลค่า','สถานะ'],rows:[...S.po].sort((a,b)=>(b.no||'').localeCompare(a.no||'')).map(p=>[p.no||'',p.date||'',p.supplier||'',p.job||'',(p.lines||[]).length,poTotal(p),(PO_ST[p.status]||[''])[0]])}; }
 function vPo(){
   const ed=canEdit('po');
@@ -2910,7 +2931,7 @@ function poModal(src){
     return h('select',{'aria-label':'ร้านของรายการนี้',onchange:async e=>{ if(e.target.value==='__new'){ const nm=await askName('ชื่อร้านที่จะสั่ง'); l.sup=(nm||'').trim(); } else l.sup=e.target.value; const sp=supHas(it,l.sup); if(sp) l.price=num(sp.price); draw(); }},h('option',{value:''},'— ไม่ระบุ —'),...names.map(n=>{ const sp=supHas(it,n); return h('option',{value:n,selected:n===cur},n+(sp?' — '+n2(sp.price):'')); }),h('option',{value:'__new'},'+ ระบุร้านอื่น…')); };
   const groups=()=>{ const m=new Map(); d.lines.forEach(l=>{ const k=eff(l); (m.get(k)||m.set(k,[]).get(k)).push(l); }); return m; };
   function showMix(){ const g=groups(); supInfo.value=g.size?[...g.keys()].map(k=>k||'ไม่ระบุร้าน').join(', '):''; if(g.size<2){ mix.style.display='none'; return; } mix.style.display='';
-    mix.replaceChildren(h('b',null,'ใบนี้มี '+g.size+' ร้าน: '),[...g].map(([k,ls])=>(k||'ไม่ระบุร้าน')+' ('+ls.length+' รายการ)').join(' · '),' — เมื่อกดบันทึก ระบบจะแยกเป็น '+g.size+' ใบสั่งซื้ออัตโนมัติ (ใบละร้าน)'); }
+    mix.replaceChildren(h('b',null,'ใบนี้มี '+g.size+' ร้าน: '),[...g].map(([k,ls])=>(k||'ไม่ระบุร้าน')+' ('+ls.length+' รายการ)').join(' · '),' — รวมอยู่ในใบเดียว (PDF ใบเดียวพร้อมตารางเทียบราคา)'); }
   function draw(){
     tb.replaceChildren(...d.lines.map((l,i)=>h('tr',null,h('td',{class:'mono'},l.code||''),h('td',null,l.name,l.itemId?null:h('div',{class:'hint'},'นอกฐานข้อมูล')),
       h('td',{style:'min-width:150px'},supCell(l)),
@@ -2955,11 +2976,11 @@ function poModal(src){
     const prev=S.po.find(x=>x.id===d.id);
     if(apprReq('po')&&d.status!=='draft'&&d.status!=='cancelled'&&!(prev&&prev.appr&&prev.appr.st==='approved')){ toast('ต้องได้รับอนุมัติก่อน จึงจะเปลี่ยนสถานะเป็น "'+PO_ST[d.status][0]+'" ได้'); return; }
     const g=groups(); let split=false;
-    split=g.size>1;
+    split=false;
     const mk=ls=>ls.map(l=>({...l,qty:num(l.qty),price:num(l.price)}));
     if(isNew) d.no=await freshNo(pre,S.po,d.no);
     if(!split){
-      const r=strip(d); r.lines=mk(d.lines); if(prev&&prev.appr) r.appr=prev.appr; else delete r.appr; if(g.size===1){ const k=[...g.keys()][0]; if(k) r.supplier=k; }
+      const r=strip(d); r.lines=mk(d.lines); if(prev&&prev.appr) r.appr=prev.appr; else delete r.appr; r.supplier=poSupNames(r.lines)||r.supplier||'';
       if(r.status==='draft'&&r.lines.every(l=>num(l.recv)>=num(l.qty))) r.status='received';
       if(prev&&prev.pnAt) r.pnAt=prev.pnAt;
       if(await put('po',d.id,r)){ closeModal(); toast('บันทึกใบสั่งซื้อแล้ว'); if(isNew) purchNotify('po',d.id); } return; }
