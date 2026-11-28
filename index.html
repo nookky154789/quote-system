@@ -2928,7 +2928,7 @@ function poFormHtml(p,L,sp,sm,cmp,save,over){
 h1{font-size:17px;text-align:center;margin:0;padding:10px 0;border-bottom:1.5px solid #111}
 .hd{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;padding:8px 10px;border-bottom:1.5px solid #111}
 .f{display:flex;gap:4px;border-bottom:1px solid #aaa;min-height:18px}.f b{white-space:nowrap}.f b.rq{color:#d91a1a}.f span{flex:1}
-table.m{width:100%;border-collapse:collapse;flex:1}table.m th,table.m td{border:1px solid #111;border-top:0;padding:3px 5px;vertical-align:top}table.m th{border-top:1px solid #111;text-align:center;font-weight:700}
+table.m{width:100%;border-collapse:collapse;flex:1}table.m th,table.m td{border:1px solid #111;border-top:0;padding:3px 5px;vertical-align:top}table.m tr.th0>td{border:0!important}table.m th{border-top:1px solid #111;text-align:center;font-weight:700}
 .c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
 tr.sup td{background:#e0eaf1;color:#0f6e84;border-left:1px solid #111}tr.sup span{float:right;color:#777;font-size:11px}
 tr.st td{font-weight:700;color:#444}tr.st td.big{font-size:13px;color:#111}th.rd{color:#d91a1a}
@@ -2937,9 +2937,9 @@ td.fill{height:100%}.sgs{display:grid;grid-template-columns:repeat(4,1fr);border
 .pb{page-break-before:always;padding:4px}h3{font-size:13px;margin:12px 0 4px;color:#0f6e84}.hn{font-size:10px;color:#777;margin-bottom:4px}
 table.ap{width:100%;border-collapse:collapse}table.ap th,table.ap td{border-bottom:1px solid #ccc;padding:3px 5px}table.ap th{background:#e0eaf1;text-align:left}tr.ch td{background:#e0eaf1;font-weight:700}
 .ok{color:#1a7f4b}.bad{color:#d91a1a}</style></head><body>
-<div class="box"><h1>ใบขอซื้อจากผู้ใช้ (PURCHASE REQUEST FROM USER)</h1>
-<div class="hd">${fl('*ชื่อลูกค้า :',p.customer,1)}${fl('*ชื่องาน :',p.job,1)}${fl('*ชื่อเครื่อง :',p.machine,1)}${fl('*เลขที่JA.',p.jaNo,1)}${fl('แผนก :',p.dept)}${fl('*วันที่ขอซื้อ :',thDate(p.date),1)}${fl('PR.NO (จัดซื้อ) :',p.no)}</div>
-<table class="m"><thead><tr><th rowspan="2" style="width:34px">ลำดับ</th><th rowspan="2">รายการสินค้า</th><th colspan="3">จำนวนที่ขอซื้อใหม่</th><th rowspan="2" class="rd" style="width:80px">วันที่ต้องการใช้</th></tr><tr><th style="width:62px">จำนวน</th><th style="width:70px">ราคา/หน่วย</th><th style="width:76px">ราคารวม</th></tr></thead><tbody>${body}<tr><td class="fill"></td><td></td><td></td><td></td><td></td><td></td></tr></tbody></table>
+<div class="box">
+<table class="m"><thead><tr class="th0"><td colspan="6" style="padding:0;border:0"><h1>ใบขอซื้อจากผู้ใช้ (PURCHASE REQUEST FROM USER)</h1>
+<div class="hd">${fl('*ชื่อลูกค้า :',p.customer,1)}${fl('*ชื่องาน :',p.job,1)}${fl('*ชื่อเครื่อง :',p.machine,1)}${fl('*เลขที่JA.',p.jaNo,1)}${fl('แผนก :',p.dept)}${fl('*วันที่ขอซื้อ :',thDate(p.date),1)}${fl('PR.NO (จัดซื้อ) :',p.no)}</div></td></tr><tr><th rowspan="2" style="width:34px">ลำดับ</th><th rowspan="2">รายการสินค้า</th><th colspan="3">จำนวนที่ขอซื้อใหม่</th><th rowspan="2" class="rd" style="width:80px">วันที่ต้องการใช้</th></tr><tr><th style="width:62px">จำนวน</th><th style="width:70px">ราคา/หน่วย</th><th style="width:76px">ราคารวม</th></tr></thead><tbody>${body}<tr><td class="fill"></td><td></td><td></td><td></td><td></td><td></td></tr></tbody></table>
 <div class="sgs">${sg}</div></div>
 ${ap?`<div class="pb"><h2 style="margin:0 0 6px">เอกสารแนบ — สรุปยอดและเปรียบเทียบราคา · ${esc(p.no||'')}</h2>${ap}</div>`:''}
 </body></html>`;
