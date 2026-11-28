@@ -1846,7 +1846,7 @@ function bomMake(d){
       else ls.push({itemId:'',code:l.code||'',name:[l.part,l.name,l.size].filter(Boolean).join(' · ')||l.code||'-',unit:'',qty:q,cost:cl.p||0}); });
     if(!ls.length){ toast('BOM นี้ไม่มีรายการที่ต้องสั่งซื้อ (ทุกรายการมีของในสต็อกแล้ว)'); return; }
     if(!await ask('สร้างใบขอซื้อ ('+(pick==='buy'?'ฟอร์มจัดซื้อ':'ฟอร์มช่าง')+') จาก BOM '+ls.length+' รายการที่ต้องสั่ง?')) return;
-    const made=await poCreate(ls,[d.title,d.customer].filter(Boolean).join(' / '),'สร้างจาก BOM: '+(d.title||'')+(u>1?' (x'+u+' เครื่อง)':''),pick);
+    const made=await poCreate(ls,[d.title,d.customer].filter(Boolean).join(' / '),'สร้างจาก BOM: '+(d.title||'')+(u>1?' (x'+u+' เครื่อง)':''),pick,{customer:d.customer||'',...(d.model?{machine:d.model}:{})});
     closeModal(); if(made.length){ view='po'; render(); poModal(made[0]); toast('สร้างใบขอซื้อแล้ว '+made[0].no); }
   }},'ตกลง')]);
 }
@@ -2879,7 +2879,7 @@ const PO_ST={draft:['ร่าง','mute'],sent:['สั่งซื้อแล
 const NO_SUP='(ยังไม่ระบุร้าน)';
 function bestSup(it){ const s=((it&&it.suppliers)||[]).filter(x=>num(x.price)>0).sort((a,b)=>num(a.price)-num(b.price))[0]; return s?{name:s.name||NO_SUP,price:num(s.price)}:{name:NO_SUP,price:num(it&&it.cost)}; }
 const poTotal=p=>(p.lines||[]).reduce((a,l)=>a+num(l.qty)*num(l.price),0);
-async function poCreate(lines,job,note,form){
+async function poCreate(lines,job,note,form,extra){
   /* ใบเดียวจบ: รวมทุกร้านไว้ในใบสั่งซื้อเดียว (แต่ละรายการระบุร้านของตัวเอง) */
   const ls=[];
   lines.forEach(l=>{ const it=l.itemId?S.items.find(i=>i.id===l.itemId):null; const b=it?bestSup(it):{name:NO_SUP,price:num(l.cost)};
@@ -2890,7 +2890,7 @@ async function poCreate(lines,job,note,form){
   ls.sort((a,b)=>String(a.sup||'￿').localeCompare(String(b.sup||'￿'),'th'));
   const pre=S.settings.poPrefix||'PO'; const all=[...S.po];
   const no=await freshNo(pre,all,nextNo(pre,all));
-  const rec={no,date:today(),supplier:poSupNames(ls),status:'draft',lines:ls,job:job||'',note:note||'',by:logBy(),...(form?{form}:{})}; const id=uid();
+  const rec={no,date:today(),supplier:poSupNames(ls),status:'draft',lines:ls,job:job||'',note:note||'',by:logBy(),...(form?{form}:{}),...(extra||{})}; const id=uid();
   if(await put('po',id,rec)){ purchNotify('po',id); return [{...rec,id}]; }
   return [];
 }
@@ -2934,7 +2934,7 @@ function poBuyHtml(p){
   const body=pages.map(pg=>{ let rem=BUD-pg.used,bl=''; while(rem>=RH){ bl+=blank; rem-=RH; } if(rem>0.3) bl+=`<tr style="height:${rem.toFixed(2)}mm">${Array(18).fill('<td></td>').join('')}</tr>`;
     return `<div class="pg"><div class="box"><div class="ttl"><b>ใบขอซื้อของจัดซื้อ (Purchase Request)</b><span class="rq">แผนก ${esc(p.dept||'')||'_______________'} &nbsp; คลัง _________</span></div>
 <div class="inf">${fld('ใช้ในงาน',p.job,'60%')}${fld('JA./JB.',p.jaNo,'40%')}</div>
-<div class="inf">${fld('วันที่ขอซื้อ',thDate(p.date),'24%')}${fld('วันที่ต้องการใช้','','24%',1)}${fld('ซื้อที่ร้าน/บริษัท',g.size>1?'หลายร้าน (ดูหัวข้อในรายการ)':(g.keys().next().value==='ไม่ระบุร้าน'?'':g.keys().next().value),'30%')}${fld('เลขที่ PR NO.',p.no,'22%')}</div>
+<div class="inf">${fld('วันที่ขอซื้อ',thDate(p.date),'24%')}${fld('วันที่ต้องการใช้','','24%',1)}${fld('ซื้อที่ร้าน/บริษัท',g.size>1?'หลายร้าน (ดูหัวข้อในรายการ)':(g.keys().next().value==='ไม่ระบุร้าน'?'':g.keys().next().value),'30%')}${fld('เลขที่ PR NO.',p.prno||p.no,'22%')}</div>
 <table class="m">${colg}${th}<tbody>${pg.rows.join('')}${bl}</tbody></table>
 <div class="ft"><div class="fl2"><div class="sv"><b class="rq">ประเมินค่าสั่งซื้อ(ยอด SAVE) :</b> ${save>0?n2(save)+' บาท':''}</div><div class="nt"><b class="rq">หมายเหตุ :</b> ${esc(p.note||'')}</div></div><div class="rs"><b class="rq">เหตุผล :</b></div><div class="sgs">${sg}</div></div></div></div>`; }).join('');
   return `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>ใบขอซื้อของจัดซื้อ ${esc(p.no||'')}</title><style>
@@ -2999,7 +2999,7 @@ function poFormHtml(p,L,sp,sm,cmp,save,over){
   const fl=(a,v,r)=>`<div class="f"><b${r?' class="rq"':''}>${a}</b><span>${esc(v||'')}</span></div>`;
   const sg=[['ผู้ขอซื้อ',p.requester||p.by||''],['ผู้รับผิดชอบ',''],['ผู้ตรวจ',(p.appr&&p.appr.by)||''],['ผู้จัดซื้อ','']].map(([a,b])=>`<div class="sg"><div>${a}</div><small>${b?'('+esc(b)+')':''}</small><div class="dt">วันที่ ____/____/____</div></div>`).join('');
   const colgroup='<colgroup><col style="width:12mm"><col><col style="width:21mm"><col style="width:23mm"><col style="width:26mm"><col style="width:26mm"></colgroup>';
-  const head=`<h1>ใบขอซื้อจากผู้ใช้ (PURCHASE REQUEST FROM USER)</h1><div class="hd">${fl('*ชื่อลูกค้า :',p.customer,1)}${fl('*ชื่องาน :',p.job,1)}${fl('*ชื่อเครื่อง :',p.machine,1)}${fl('*เลขที่JA.',p.jaNo,1)}${fl('แผนก :',p.dept)}${fl('*วันที่ขอซื้อ :',thDate(p.date),1)}${fl('PR.NO (จัดซื้อ) :',p.no)}</div>`;
+  const head=`<h1>ใบขอซื้อจากผู้ใช้ (PURCHASE REQUEST FROM USER)</h1><div class="hd">${fl('*ชื่อลูกค้า :',p.customer,1)}${fl('*ชื่องาน :',p.job,1)}${fl('*ชื่อเครื่อง :',p.machine,1)}${fl('*เลขที่JA.',p.jaNo,1)}${fl('แผนก :',p.dept)}${fl('*วันที่ขอซื้อ :',thDate(p.date),1)}${fl('PR.NO (จัดซื้อ) :',p.prno||p.no)}</div>`;
   const th='<thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">รายการสินค้า</th><th colspan="3">จำนวนที่ขอซื้อใหม่</th><th rowspan="2" class="rd">วันที่ต้องการใช้</th></tr><tr><th>จำนวน</th><th>ราคา/หน่วย</th><th>ราคารวม</th></tr></thead>';
   const pgHtml=pages.map((pg,i)=>{ let rem=BUD-pg.used, bl=''; while(rem>=RH){ bl+=blank; rem-=RH; }
     if(rem>0.3) bl+=`<tr style="height:${rem.toFixed(2)}mm">${[1,2,3,4,5,6].map(()=>`<td></td>`).join('')}</tr>`;
@@ -3106,7 +3106,8 @@ function poModal(src){
   drawAppr();
   const stSel=h('select',{id:'po_st',disabled:!ed,onchange:e=>d.status=e.target.value},...Object.entries(PO_ST).map(([k,v])=>h('option',{value:k,selected:k===d.status},v[0])));
   const body=h('div',null,
-    h('div',{class:'grid g4'},inp('no','เลขที่'),inp('date','วันที่','date'),supField(),inp('job','อ้างอิงงาน / ใบเบิก'),h('div',{class:'field'},h('label',{for:'po_form'},'ฟอร์มใบขอซื้อ (PDF)'),h('select',{id:'po_form',onchange:e=>{ d.form=e.target.value; }},h('option',{value:'tech',selected:d.form!=='buy'},'ฟอร์มช่าง (ใบขอซื้อจากผู้ใช้)'),h('option',{value:'buy',selected:d.form==='buy'},'ฟอร์มจัดซื้อ (A4 แนวนอน)')))),
+    h('div',{class:'grid g4'},inp('no','เลขที่'),inp('date','วันที่ (วันที่ขอซื้อ)','date'),supField(),inp('job','*ชื่องาน / อ้างอิงงาน / ใบเบิก'),h('div',{class:'field'},h('label',{for:'po_form'},'ฟอร์มใบขอซื้อ (PDF)'),h('select',{id:'po_form',onchange:e=>{ d.form=e.target.value; }},h('option',{value:'tech',selected:d.form!=='buy'},'ฟอร์มช่าง (ใบขอซื้อจากผู้ใช้)'),h('option',{value:'buy',selected:d.form==='buy'},'ฟอร์มจัดซื้อ (A4 แนวนอน)')))),
+    h('div',{class:'grid g4'},inp('customer','*ชื่อลูกค้า'),inp('machine','*ชื่อเครื่อง'),inp('jaNo','*เลขที่ JA.'),inp('dept','แผนก'),inp('prno','PR.NO (จัดซื้อ)')),
     h('div',{class:'field',style:'max-width:240px;margin-top:8px'},h('label',{for:'po_st'},'สถานะ'),stSel),
     apprBox,
     h('h2',{style:'margin-top:14px'},'รายการสั่งซื้อ'),mix,
