@@ -1438,6 +1438,7 @@ function xlsxBuild(t){
   const R=[]; R.push({c:[t.title],st:'title'});
   (t.meta||[]).forEach(m=>R.push({c:m,st:'meta'})); if((t.meta||[]).length) R.push({c:[],st:'n'});
   R.push({c:t.head,st:'head'}); t.rows.forEach(r=>R.push({c:r,st:'n'})); if((t.foot||[]).length){ R.push({c:[],st:'n'}); t.foot.forEach(r=>R.push({c:r,st:'foot'})); }
+  (t.extra||[]).forEach(x=>{ R.push({c:[],st:'n'}); R.push({c:[x.title],st:'title'}); R.push({c:x.head,st:'head'}); x.rows.forEach(r=>R.push({c:r,st:r.hl?'foot':'n'})); });
   const nc=Math.max(1,...R.map(r=>r.c.length)); const wid=new Array(nc).fill(8);
   [t.head,...t.rows,...(t.foot||[])].forEach(r=>r.forEach((v,i)=>{ const L=String(v==null?'':(typeof v==='number'?v.toFixed(2):v)).length; if(L>wid[i]) wid[i]=Math.min(60,L); }));
   const sty={title:{s:3,n:3},head:{s:1,n:1},meta:{s:0,n:0,first:4},foot:{s:4,n:5},n:{s:0,n:2}};
@@ -1457,7 +1458,7 @@ function xlsxBuild(t){
     {name:'xl/styles.xml',text:styles},{name:'xl/worksheets/sheet1.xml',text:sheet}]);
 }
 function tableCsv(t){
-  const rows=[[t.title],...(t.meta||[]),[],t.head,...t.rows,...((t.foot||[]).length?[[],...t.foot]:[])];
+  const rows=[[t.title],...(t.meta||[]),[],t.head,...t.rows,...((t.foot||[]).length?[[],...t.foot]:[]),...(t.extra||[]).flatMap(x=>[[],[x.title],x.head,...x.rows])];
   return '﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
 }
 function tableHtml(t){
@@ -1474,7 +1475,7 @@ td.n{text-align:right;white-space:nowrap}thead{display:table-header-group}tr{pag
 .pd{margin-top:8px;font-size:10px;color:#777}@page{size:A4 ${wide?'landscape':'portrait'};margin:12mm}</style></head><body>
 <div class="co">${esc(s.company||'')}</div><h1>${esc(t.title)}</h1>
 <div class="meta">${(t.meta||[]).map(m=>`<div><b>${esc(m[0])}</b> ${esc(m.slice(1).join('  '))}</div>`).join('')}</div>
-<table><thead><tr>${t.head.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${body}${foot}</tbody></table>
+<table><thead><tr>${t.head.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${body}${foot}</tbody></table>${(t.extra||[]).map(x=>`<h2 style="margin-top:16px">${esc(x.title)}</h2>${x.note?`<div class="meta">${esc(x.note)}</div>`:''}<table style="width:auto;min-width:60%"><thead><tr>${x.head.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${x.rows.map(r=>`<tr${r.hl?' class="ft"':''}>`+x.head.map((_,i)=>`<td${isN(r[i])?' class="n"':''}>${f(r[i])}</td>`).join('')+'</tr>').join('')}</tbody></table>`).join('')}
 <div class="pd">พิมพ์เมื่อ ${thDate(today())}</div></body></html>`;
 }
 async function pdfSave(html,name,landscape){
@@ -2890,17 +2891,22 @@ async function poFromLow(){
   toast('สร้างใบสั่งซื้อแล้ว (ใบเดียว '+low.length+' รายการ)'); view='po'; render();
 }
 let poF='open';
-function tPo(p){ const L=p.lines||[]; const pr=(k,t)=>{ const r=['',t,'','','','','','']; r[k]=true; return r; }; const sm=new Map(); L.forEach(l=>{ const k=String(l.sup||p.supplier||'ไม่ระบุร้าน'); const a=sm.get(k)||{n:0,t:0}; a.n++; a.t+=num(l.qty)*num(l.price); sm.set(k,a); });
-  const rows=[]; L.forEach((l,i)=>rows.push([i+1,l.code||'',l.name||'',l.sup||p.supplier||'',num(l.qty),l.unit||'',num(l.price),num(l.qty)*num(l.price)]));
-  const cmp=poCompare(p); let save=0;
-  if(sm.size>1){ rows.push(pr('sec','สรุปยอดแยกตามร้าน')); [...sm].forEach(([k,a])=>rows.push(['','',k+' ('+a.n+' รายการ)','','','','',a.t])); }
-  if(cmp.length){ rows.push(pr('sec','เปรียบเทียบราคา (รายการที่มีหลายร้าน) — ✓ = ร้านที่เลือก'));
-    cmp.forEach(c=>{ const hi=c.offers[c.offers.length-1].price, cur=num(c.l.price); const ch=String(c.l.sup||'');
-      save+=Math.max(0,(hi-cur)*num(c.l.qty));
-      rows.push(pr('sub',(c.l.code?c.l.code+' ':'')+(c.l.name||'')+'  (สั่ง '+n0(c.l.qty)+' '+(c.l.unit||'')+')'));
-      c.offers.forEach((o,j)=>rows.push(['','',(o.name===ch?'✓ ':'')+o.name+(j===0?'  [ถูกสุด]':''),'','',c.l.unit||'',o.price,o.price*num(c.l.qty)])); });
-    if(save>0) rows.push(pr('sub','สั่งตามร้านที่เลือก ประหยัดกว่าร้านราคาสูงสุด รวม '+n2(save)+' บาท')); }
-  return {name:'ใบสั่งซื้อ '+p.no,title:'ใบสั่งซื้อ '+p.no,meta:[['วันที่',thDate(p.date)],['ผู้ขาย',poSupNames(L)||p.supplier||'-'],['อ้างอิงงาน',p.job||'-'],['สถานะ',(PO_ST[p.status]||[''])[0]]],head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]]}; }
+function tPo(p){ const L0=p.lines||[]; const sp=(l)=>String(l.sup||(!String(p.supplier||'').includes(', ')?p.supplier:'')||'').trim();
+  const L=[...L0].sort((a,b)=>(sp(a)||'\uffff').localeCompare(sp(b)||'\uffff','th'));
+  const sm=new Map(); L.forEach(l=>{ const k=sp(l)||'ไม่ระบุร้าน'; const a=sm.get(k)||{n:0,t:0}; a.n++; a.t+=num(l.qty)*num(l.price); sm.set(k,a); });
+  const names=[...sm.keys()].filter(k=>k!=='ไม่ระบุร้าน');
+  const rows=L.map((l,i)=>[i+1,l.code||'',l.name||'',sp(l)||'ไม่ระบุร้าน',num(l.qty),l.unit||'',num(l.price),num(l.qty)*num(l.price)]);
+  const extra=[]; let save=0, over=0;
+  if(sm.size>1){ const sr=[...sm].sort((a,b)=>b[1].t-a[1].t).map(([k,a])=>[k,a.n,a.t]); sr.push(Object.assign(['รวมทุกร้าน',L.length,poTotal(p)],{hl:1})); extra.push({title:'สรุปยอดแยกตามร้าน ('+sm.size+' ร้าน)',head:['ร้าน','จำนวนรายการ','ยอดรวม (บาท)'],rows:sr}); }
+  const cmp=poCompare({lines:L});
+  if(cmp.length){ const cr=[]; cmp.forEach(c=>{ const lo=c.offers[0].price, cur=num(c.l.price), q=num(c.l.qty), ch=sp(c.l);
+      save+=Math.max(0,(c.offers[c.offers.length-1].price-cur)*q); over+=Math.max(0,(cur-lo)*q);
+      c.offers.forEach((o,j)=>cr.push([j?'':((c.l.code?c.l.code+' ':'')+(c.l.name||'')+' (สั่ง '+n0(c.l.qty)+' '+(c.l.unit||'')+')'),o.name+(o.name===ch?'  ◀ เลือก':''),o.price,o.price*q,j===0?'ถูกสุด':'+'+n2(o.price-lo)+' ('+(lo>0?Math.round((o.price/lo-1)*100):0)+'%)'])); });
+    extra.push({title:'เปรียบเทียบราคาร้านค้า ('+cmp.length+' รายการที่มีหลายร้าน)',note:'ส่วนต่างเทียบกับร้านที่ราคาต่ำสุดของสินค้านั้น · ◀ เลือก = ร้านที่ใช้สั่งในใบนี้',head:['สินค้า','ร้าน','ราคา/หน่วย','รวม (บาท)','ส่วนต่าง'],rows:cr}); }
+  const meta=[['วันที่',thDate(p.date)],['ผู้ขาย',names.length>3?names.length+' ร้าน (ดูสรุปยอดแยกตามร้านท้ายเอกสาร)':(names.join(', ')||p.supplier||'-')],['อ้างอิงงาน',p.job||'-'],['สถานะ',(PO_ST[p.status]||[''])[0]]];
+  if(save>0) meta.push(['ประหยัดจากการเทียบราคา','สั่งตามร้านที่เลือก ถูกกว่าร้านราคาสูงสุด '+n2(save)+' บาท']);
+  if(over>0) meta.push(['หมายเหตุราคา','มีรายการที่ไม่ได้เลือกร้านถูกสุด ส่วนต่างรวม '+n2(over)+' บาท']);
+  return {name:'ใบสั่งซื้อ '+p.no,title:'ใบสั่งซื้อ '+p.no,meta,head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]],extra}; }
 function tPoList(){ return {name:'ใบสั่งซื้อ '+nowStamp(),title:'รายการใบสั่งซื้อ',head:['เลขที่','วันที่','ผู้ขาย','งาน','รายการ','มูลค่า','สถานะ'],rows:[...S.po].sort((a,b)=>(b.no||'').localeCompare(a.no||'')).map(p=>[p.no||'',p.date||'',p.supplier||'',p.job||'',(p.lines||[]).length,poTotal(p),(PO_ST[p.status]||[''])[0]])}; }
 let poSelMode=false; const poSel=new Set();
 async function poDelSel(){
@@ -2934,7 +2940,7 @@ function vPo(){
 function poModal(src){
   const isNew=!src; const pre=S.settings.poPrefix||'PO';
   const d=src?JSON.parse(JSON.stringify(src)):{id:uid(),no:nextNo(pre,S.po),date:today(),supplier:'',status:'draft',lines:[],job:'',note:''};
-  d.lines.forEach(l=>{ if(!l.sup&&d.supplier) l.sup=d.supplier; });
+  d.lines.forEach(l=>{ if(!l.sup&&d.supplier&&!String(d.supplier).includes(', ')) l.sup=d.supplier; });
   const ed=canEdit('po')&&d.status!=='cancelled'; const tb=h('tbody'), tot=h('div',{class:'mono',style:'text-align:right;margin-top:8px;font-weight:700'});
   const sups=[...new Set(S.items.flatMap(i=>(i.suppliers||[]).map(s=>s.name).filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'th'));
   const sumUp=()=>{ tot.textContent='รวมทั้งสิ้น '+n2(poTotal(d))+' บาท'; };
