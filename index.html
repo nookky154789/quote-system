@@ -255,7 +255,10 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--accent);box
 
 /* ===== UI v3: Glassmorphism (frosted glass บนพื้นหลังเบลอสีสด + การ์ดขาว + ปุ่มเหลืองอำพัน) ===== */
 :root{--amber:#f7b500;--amber2:#ffd24d;--gl:rgba(255,255,255,.34);--gl-b:rgba(255,255,255,.55);--gl-in:rgba(255,255,255,.78)}
-@media(prefers-color-scheme:dark){:root{--gl:rgba(30,38,52,.42);--gl-b:rgba(255,255,255,.14);--gl-in:rgba(30,38,52,.72)}}
+:root{--gl-th:rgba(255,255,255,.28);--gl-hv:rgba(255,255,255,.35)}
+@media(prefers-color-scheme:dark){:root:not([data-theme]){--gl:rgba(30,38,52,.42);--gl-b:rgba(255,255,255,.14);--gl-in:rgba(30,38,52,.72);--gl-th:rgba(255,255,255,.07);--gl-hv:rgba(255,255,255,.08)}}
+:root[data-theme="dark"]{--gl:rgba(30,38,52,.42);--gl-b:rgba(255,255,255,.14);--gl-in:rgba(30,38,52,.72);--gl-th:rgba(255,255,255,.07);--gl-hv:rgba(255,255,255,.08)}
+:root[data-theme="light"],:root[data-theme="nature"],:root[data-theme="sea"],:root[data-theme="mountain"]{--gl:rgba(255,255,255,.34);--gl-b:rgba(255,255,255,.55);--gl-in:rgba(255,255,255,.78);--gl-th:rgba(255,255,255,.28);--gl-hv:rgba(255,255,255,.35)}
 body{background:#cfd8e3;position:relative}
 body:before{content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none;filter:blur(70px) saturate(1.3);
   background:
@@ -267,8 +270,8 @@ body:before{content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none;
 @keyframes orb{to{transform:translate3d(2%,-2%,0) scale(1.08) rotate(3deg)}}
 .card,.tablewrap,.kpi,nav.rail{background:var(--gl)!important;border:1px solid var(--gl-b)!important;-webkit-backdrop-filter:blur(22px) saturate(1.6);backdrop-filter:blur(22px) saturate(1.6);box-shadow:0 8px 32px rgba(31,38,80,.12),inset 0 1px 0 rgba(255,255,255,.5)!important}
 .modal{background:var(--gl-in)!important;border:1px solid var(--gl-b);-webkit-backdrop-filter:blur(26px) saturate(1.5);backdrop-filter:blur(26px) saturate(1.5)}
-th{background:rgba(255,255,255,.28)}
-table tr:hover td{background:rgba(255,255,255,.35)}
+th{background:var(--gl-th)}
+table tr:hover td{background:var(--gl-hv)}
 input,select,textarea{background:var(--gl-in)}
 .btn{background:var(--gl-in);border-color:var(--gl-b)}
 /* ปุ่มหลัก = เหลืองอำพันแบบในแบบ */
@@ -326,6 +329,13 @@ body:before{filter:blur(70px) saturate(1.05)!important;background:
  radial-gradient(36% 36% at 18% 88%,var(--o4) 0,transparent 70%),
  radial-gradient(30% 30% at 50% 48%,var(--o5) 0,transparent 72%)!important}
 :root[data-bg="vivid"] body:before{filter:blur(70px) saturate(1.3)!important}
+
+/* focus ที่มองเห็นชัด (หลัง all:unset) */
+nav.rail button:focus-visible,#mtop button:focus-visible,.hm-chip:focus-visible,.todo:focus-visible,.kpi.click:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+/* ลดการเคลื่อนไหว/พื้นหลังเรียบ = ปิดแอนิเมชันและเบลอ */
+@media(prefers-reduced-motion:reduce){body:before{animation:none!important}}
+:root[data-bg="plain"] body:before{display:none}
+:root[data-bg="plain"] .card,:root[data-bg="plain"] .tablewrap,:root[data-bg="plain"] .kpi,:root[data-bg="plain"] nav.rail,:root[data-bg="plain"] .modal,:root[data-bg="plain"] .hm-hero,:root[data-bg="plain"] .hm-chip,:root[data-bg="plain"] .modal-bg{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 </style>
 </head>
 <body>
@@ -1035,7 +1045,7 @@ function tile(n,l,cls){ return h('div',{class:'card tile'},h('div',{class:'n',st
 
 /* ---------- Items ---------- */
 /* ---------- user display preferences (per user, stored on this device) ---------- */
-const PREF_DEF={menus:{},itemTabs:{list:1,sum:1,hist:1},itemCols:{code:1,name:1,cat:1,cost:1,minp:1,stock:1,rop:1,status:1,modAt:1,modBy:1},itemLimit:0,histN:20,hist:{req:1,ref:1},
+const PREF_DEF={menus:{},itemTabs:{list:1,sum:1,hist:1},itemCols:{code:1,name:1,cat:1,cost:1,minp:1,stock:1,rop:1,status:1,modAt:1,modBy:1},itemLimit:200,histN:20,hist:{req:1,ref:1},
   sum:{tiles:1,catOut:1,catIn:1,detOut:1,detIn:1,req:1},home:{activity:1},ja:{tasks:1,mats:1,hist:1,note:1,list:1},bomCols:{kind:1,files:1,lines:1,total:1,mod:1}};
 let _pf=null,_raw=null,_pfU='';
 const uiHide=()=>((CU&&CU.perms&&CU.perms._ui&&CU.perms._ui.hide)||{});
@@ -1082,7 +1092,7 @@ function prefModal(){
     h('button',{class:'btn primary',onclick:()=>{ savePrefs(); closeModal(); applyPrefs(); toast('บันทึกการตั้งค่าแล้ว'); }},'บันทึก')]);
 }
 function applyPrefs(){ const P=prefs(); itemLimit=P.itemLimit; buildRail(); updateRail(); render(); }
-let itemQ='', itemSort='code', itemCat='all', itemWh=new Set(), itemLimit=0, _limInit=false;
+let itemQ='', itemSort='code', itemCat='all', itemWh=new Set(), itemLimit=200, _limInit=false;
 const ITEM_SORTS=[['code','รหัส ก→ฮ / A→Z'],['name','ชื่อ ก→ฮ / A→Z'],['cat','หมวด'],['cost_d','ต้นทุน มาก→น้อย'],['cost_a','ต้นทุน น้อย→มาก'],['stock_d','คงเหลือ มาก→น้อย'],['stock_a','คงเหลือ น้อย→มาก'],['low','ใกล้หมด/หมดก่อน']];
 function itemSortFn(k){
   const t=(a,b)=>String(a||'').localeCompare(String(b||''),'th',{numeric:true});
@@ -1279,7 +1289,7 @@ function vLow(){
 function vItems(){
   if(!_limInit){ _limInit=true; itemLimit=prefs().itemLimit; }
   const el=h('div',null,h('h1',null,'วัสดุ / สินค้า'),h('p',{class:'sub'},'ฐานข้อมูลกลางที่ใช้ทั้งการประมาณราคา ใบเสนอราคา และการเบิกของ'));
-  const q=h('input',{type:'search',placeholder:'ค้นหารหัส ชื่อ หมวด',value:itemQ,id:'itemq','aria-label':'ค้นหา',oninput:e=>{itemQ=e.target.value;renderItemRows();}});
+  const q=h('input',{type:'search',placeholder:'ค้นหารหัส ชื่อ หมวด',value:itemQ,id:'itemq','aria-label':'ค้นหา',oninput:e=>{itemQ=e.target.value;clearTimeout(window._itq);window._itq=setTimeout(renderItemRows,180);}});
   const catCnt=new Map(); S.items.forEach(i=>{ const c=catNorm(i.category); catCnt.set(c,(catCnt.get(c)||0)+1); });
   const grpCnt=g=>[...catCnt].filter(([c])=>c&&catGroup(c)===g).reduce((a,[,n])=>a+n,0);
   const catOpts=()=>[h('option',{value:'all'},'ทุกหมวด ('+S.items.length+')'),
@@ -1809,7 +1819,7 @@ function seedModal(){
 
 /* ---------- generic modal ---------- */
 function openModal(title,body,footerBtns){
-  closeModal();
+  const _op=document.activeElement; closeModal(); _mOpener=(_op&&_op!==document.body)?_op:null;
   const m=h('div',{class:'modal',role:'dialog','aria-modal':'true','aria-label':title},
     h('header',null,h('h2',{style:'margin:0'},title),h('button',{class:'btn small',onclick:closeModal,'aria-label':'ปิด'},'ปิด')),
     body,h('footer',null,...(footerBtns||[])));
@@ -1819,7 +1829,9 @@ function openModal(title,body,footerBtns){
     onclick:e=>{ const bg=e.currentTarget; if(bgDown&&e.target===bg&&e.clientX<bg.clientWidth&&e.clientY<bg.clientHeight) closeModal(); bgDown=false; }},m));
   setTimeout(()=>{ const f=m.querySelector('input:not([type=checkbox]):not([type=file]):not([type=date]),textarea'); if(f) f.focus(); },30);
 }
-function closeModal(){ $('#layer').replaceChildren(); }
+let _mOpener=null;
+function closeModal(){ $('#layer').replaceChildren(); if(_mOpener&&document.body.contains(_mOpener)){ try{ _mOpener.focus(); }catch(_){} } _mOpener=null; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!document.querySelector('[role=alertdialog]')&&$('#layer')&&$('#layer').children.length) closeModal(); });
 /* in-app confirm dialog (native confirm() can freeze text inputs in the desktop window) */
 function ask(msg,okLabel='ยืนยัน'){
   return new Promise(res=>{
@@ -1828,6 +1840,7 @@ function ask(msg,okLabel='ยืนยัน'){
     bg.append(h('div',{class:'modal',role:'alertdialog','aria-label':msg,style:'width:min(420px,100%)'},
       h('p',{style:'margin:0 0 6px;font-size:16px'},msg),
       h('footer',null,h('button',{class:'btn',onclick:()=>done(false)},'ยกเลิก'),h('button',{class:'btn primary',id:'askok',onclick:()=>done(true)},okLabel))));
+    bg.addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.stopPropagation(); done(false); } });
     document.body.append(bg); setTimeout(()=>{ const b=$('#askok'); if(b) b.focus(); },0);
   });
 }
@@ -3506,7 +3519,7 @@ function opsCard(){
       ...L.map(u=>h('div',{style:'display:flex;gap:8px;align-items:center;padding:3px 0;flex-wrap:wrap'},h('span',{style:'min-width:110px'},u.name||'-'),
         u.role==='admin'?h('span',{class:'hint'},'แอดมิน — เห็นทั้งหมด (ยอด + ราคา)'):
         h('select',{'aria-label':'สิทธิ์ค้นหาสินค้า '+(u.name||''),onchange:async e=>{ const {error}=await SB.rpc('admin_line_set_perm',{p_user:u.user_id,p_perm:e.target.value}); toast(error?'ไม่สำเร็จ: '+errMsg(error):'บันทึกสิทธิ์แล้ว'); }},
-          ...[['none','ไม่ให้ใช้คำสั่งค้นหา'],['qty','ดูยอดคงเหลือ (ไม่เห็นราคา)'],['full','ดูยอด + ราคา']].map(([v,t])=>h('option',{value:v,selected:u.stock_perm===v},t)))),u.role==='admin'?null:featBox(u)));
+          ...[['none','ไม่ให้ใช้คำสั่งค้นหา'],['qty','ดูยอดคงเหลือ (ไม่เห็นราคา)'],['full','ดูยอด + ราคา']].map(([v,t])=>h('option',{value:v,selected:u.stock_perm===v},t))),u.role==='admin'?null:featBox(u))));
   }; loadLinks();
   const snapBox=h('div',{class:'hint'},online?'กำลังโหลด…':'ใช้ได้เฉพาะเวอร์ชันออนไลน์');
   const loadSnap=async()=>{ if(!online) return; const {data,error}=await SB.rpc('admin_snapshot_info'); if(error){ snapBox.textContent='โหลดไม่ได้: '+errMsg(error); return; }
@@ -3742,8 +3755,8 @@ function vSettings(){
 (function(){
   const mm=document.getElementById('mmenu'); if(mm) mm.addEventListener('click',()=>{ try{ if(CU) mobileMenu(); }catch(_){} });
   let pend=false;
-  new MutationObserver(()=>{ if(pend) return; pend=true; requestAnimationFrame(()=>{ pend=false; try{ mobilize(document); }catch(_){} }); })
-    .observe(document.body,{childList:true,subtree:true});
+  const _ly=document.getElementById('layer'); if(_ly) new MutationObserver(()=>{ if(pend) return; pend=true; requestAnimationFrame(()=>{ pend=false; try{ mobilize(_ly); }catch(_){} }); })
+    .observe(_ly,{childList:true,subtree:true});
 })();
 
 bootstrap();
