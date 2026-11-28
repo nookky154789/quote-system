@@ -2846,7 +2846,7 @@ async function apprRequest(kind,col,rec){
   if(!await put(col,rec.id,strip({...rec,appr}))) return false;
   rec.appr=appr;
   try{ const {data,error}=await SB.functions.invoke('line-approve',{body:{action:'request',kind,id:rec.id}});
-    if(error) toast('ส่งขออนุมัติแล้ว แต่แจ้ง LINE ไม่สำเร็จ'); else if(data&&data.n) toast('ส่งขออนุมัติทาง LINE แล้ว ('+data.n+' คน)'); else toast('ส่งขออนุมัติแล้ว — ยังไม่มีผู้อนุมัติที่ผูก LINE (อนุมัติในโปรแกรมได้)');
+    if(error) toast('ส่งขออนุมัติแล้ว แต่แจ้ง LINE ไม่สำเร็จ'); else if(data&&data.n&&data.pushErr) toast('ส่งขออนุมัติแล้ว แต่ LINE ส่งข้อความไม่ได้ ('+(/429/.test(data.pushErr)?'โควตาข้อความ LINE ประจำเดือนเต็ม':data.pushErr)+') — ผู้อนุมัติกดอนุมัติในโปรแกรมได้'); else if(data&&data.n) toast('ส่งขออนุมัติทาง LINE แล้ว ('+data.n+' คน)'+(data.skippedRequester?' · ไม่ส่งให้ผู้ขอเอง':'')); else toast('ส่งขออนุมัติแล้ว — ยังไม่มีผู้อนุมัติที่ผูก LINE (อนุมัติในโปรแกรมได้)');
   }catch(e){ toast('ส่งขออนุมัติแล้ว แต่แจ้ง LINE ไม่สำเร็จ'); }
   return true; }
 async function apprDecide(kind,col,rec,ok){
