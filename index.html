@@ -1169,7 +1169,14 @@ async function expParseFile(f){
   let t; const buf=await f.arrayBuffer(); try{ t=new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ t=new TextDecoder('windows-874').decode(buf); }
   return expParseText(t);
 }
-function expParseText(t){ return t.split(/\r?\n/).filter(l=>l.trim()).map(l=>{ const d=l.includes('\t')?'\t':','; return d==='\t'?l.split('\t').map(c=>c.replace(/^"|"$/g,'').trim()):l.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c=>c.replace(/^"|"$/g,'').trim()); }); }
+function csvSplitLine(l){
+  if(l.includes('\t')) return l.split('\t').map(c=>c.replace(/^"|"$/g,'').trim());
+  let parts=l.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+  /* ชื่อสินค้ามีเครื่องหมายนิ้ว (เช่น 3") ทำให้เครื่องหมาย " ไม่คู่กัน → แยกช่องไม่ออกและทั้งบรรทัดถูกรวมเป็นช่องเดียว: ถอยไปแยกด้วยจุลภาคตรง ๆ */
+  if((parts.length<4||parts.some(c=>c.includes(',')&&!/^"[\s\S]*"$/.test(c.trim())))&&(l.match(/,/g)||[]).length>=4) parts=l.split(',');
+  return parts.map(c=>{ c=c.trim(); if(c==='"') return ''; const m=c.match(/^"([\s\S]*)"$/); return (m?m[1]:c).trim(); });
+}
+function expParseText(t){ return t.split(/\r?\n/).filter(l=>l.trim()).map(csvSplitLine); }
 function expNum(v){ if(typeof v==='number') return v; const x=parseFloat(String(v==null?'':v).replace(/[,\s฿]/g,'').replace(/^\((.*)\)$/,'-$1')); return isNaN(x)?null:x; }
 function expDetect(rows){
   let hi=0,best=-1; rows.slice(0,15).forEach((r,i)=>{ const sc=r.filter(c=>typeof c==='string'&&EXP_COLS.some(([,,re])=>re.test(c))).length; if(sc>best){ best=sc; hi=i; } });
@@ -1390,7 +1397,7 @@ function importModal(){
   openModal('นำเข้าวัสดุจากตาราง',h('div',null,h('p',{class:'hint'},'คัดลอกแถวจาก Excel มาวาง ลำดับคอลัมน์: รหัส, ชื่อ, หน่วย, หมวด, ต้นทุน, คงเหลือ, จุดสั่งซื้อ (แถวแรกถ้าเป็นหัวตารางจะข้ามให้เอง)'),ta),[
     h('button',{class:'btn',onclick:closeModal},'ยกเลิก'),
     h('button',{class:'btn primary',onclick:async()=>{
-      const rows=ta.value.split(/\r?\n/).map(r=>r.split(/\t|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c=>c.replace(/^"|"$/g,'').trim())).filter(r=>r.length>1&&r[1]);
+      const rows=ta.value.split(/\r?\n/).map(csvSplitLine).filter(r=>r.length>1&&r[1]);
       let c=0;
       for(const r of rows){
         if(r[4] && isNaN(parseFloat(r[4].replace(/,/g,'')))) continue;
