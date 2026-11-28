@@ -2932,9 +2932,9 @@ function poBuyHtml(p){
   add(RH,`<tr class="st" style="height:${RH}mm"><td colspan="4" class="r"><div class="k">รวมทั้งสิ้น (บาท)</div></td>${cell(n2(grand),'r')}${Array(13).fill('<td></td>').join('')}</tr>`);
   const fld=(a,v,w,r)=>`<div class="fl" style="width:${w}"><b${r?' class="rq"':''}>${a}</b><span>${esc(v||'')}</span></div>`;
   const body=pages.map(pg=>{ let rem=BUD-pg.used,bl=''; while(rem>=RH){ bl+=blank; rem-=RH; } if(rem>0.3) bl+=`<tr style="height:${rem.toFixed(2)}mm">${Array(18).fill('<td></td>').join('')}</tr>`;
-    return `<div class="pg"><div class="box"><div class="ttl"><b>ใบขอซื้อของจัดซื้อ (Purchase Request)</b><span class="rq">แผนก ${esc(p.dept||'')||'_______________'} &nbsp; คลัง _________</span></div>
+    return `<div class="pg"><div class="box"><div class="ttl"><b>ใบขอซื้อของจัดซื้อ (Purchase Request)</b><span class="rq">แผนก ${esc(p.dept||'')||'_______________'} &nbsp; คลัง ${esc(p.wh||'')||'_________'}</span></div>
 <div class="inf">${fld('ใช้ในงาน',p.job,'60%')}${fld('JA./JB.',p.jaNo,'40%')}</div>
-<div class="inf">${fld('วันที่ขอซื้อ',thDate(p.date),'24%')}${fld('วันที่ต้องการใช้','','24%',1)}${fld('ซื้อที่ร้าน/บริษัท',g.size>1?'หลายร้าน (ดูหัวข้อในรายการ)':(g.keys().next().value==='ไม่ระบุร้าน'?'':g.keys().next().value),'30%')}${fld('เลขที่ PR NO.',p.prno||p.no,'22%')}</div>
+<div class="inf">${fld('วันที่ขอซื้อ',thDate(p.date),'24%')}${fld('วันที่ต้องการใช้',thDate(p.needBy),'24%',1)}${fld('ซื้อที่ร้าน/บริษัท',g.size>1?'หลายร้าน (ดูหัวข้อในรายการ)':(g.keys().next().value==='ไม่ระบุร้าน'?'':g.keys().next().value),'30%')}${fld('เลขที่ PR NO.',p.prno||p.no,'22%')}</div>
 <table class="m">${colg}${th}<tbody>${pg.rows.join('')}${bl}</tbody></table>
 <div class="ft"><div class="fl2"><div class="sv"><b class="rq">ประเมินค่าสั่งซื้อ(ยอด SAVE) :</b> ${save>0?n2(save)+' บาท':''}</div><div class="nt"><b class="rq">หมายเหตุ :</b> ${esc(p.note||'')}</div></div><div class="rs"><b class="rq">เหตุผล :</b></div><div class="sgs">${sg}</div></div></div></div>`; }).join('');
   return `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>ใบขอซื้อของจัดซื้อ ${esc(p.no||'')}</title><style>
@@ -3105,9 +3105,14 @@ function poModal(src){
       h('div',{class:'hint'},'ผู้อนุมัติได้รับการ์ดใน LINE พร้อมปุ่ม อนุมัติ / ไม่อนุมัติ · การอนุมัติอิงข้อมูลที่บันทึกแล้ว')); };
   drawAppr();
   const stSel=h('select',{id:'po_st',disabled:!ed,onchange:e=>d.status=e.target.value},...Object.entries(PO_ST).map(([k,v])=>h('option',{value:k,selected:k===d.status},v[0])));
+  const hdr=h('div',null);
+  const drawHdr=()=>{ hdr.replaceChildren(d.form==='buy'
+    ?h('div',{class:'grid g4'},inp('job','ใช้ในงาน'),inp('jaNo','JA./JB.'),inp('dept','แผนก'),inp('wh','คลัง'),inp('needBy','วันที่ต้องการใช้','date'),inp('prno','เลขที่ PR NO.'))
+    :h('div',{class:'grid g4'},inp('job','*ชื่องาน'),inp('customer','*ชื่อลูกค้า'),inp('machine','*ชื่อเครื่อง'),inp('jaNo','*เลขที่ JA.'),inp('dept','แผนก'),inp('prno','PR.NO (จัดซื้อ)'))); };
+  drawHdr();
   const body=h('div',null,
-    h('div',{class:'grid g4'},inp('no','เลขที่'),inp('date','วันที่ (วันที่ขอซื้อ)','date'),supField(),inp('job','*ชื่องาน / อ้างอิงงาน / ใบเบิก'),h('div',{class:'field'},h('label',{for:'po_form'},'ฟอร์มใบขอซื้อ (PDF)'),h('select',{id:'po_form',onchange:e=>{ d.form=e.target.value; }},h('option',{value:'tech',selected:d.form!=='buy'},'ฟอร์มช่าง (ใบขอซื้อจากผู้ใช้)'),h('option',{value:'buy',selected:d.form==='buy'},'ฟอร์มจัดซื้อ (A4 แนวนอน)')))),
-    h('div',{class:'grid g4'},inp('customer','*ชื่อลูกค้า'),inp('machine','*ชื่อเครื่อง'),inp('jaNo','*เลขที่ JA.'),inp('dept','แผนก'),inp('prno','PR.NO (จัดซื้อ)')),
+    h('div',{class:'grid g4'},inp('no','เลขที่'),inp('date','วันที่ (วันที่ขอซื้อ)','date'),supField(),h('div',{class:'field'},h('label',{for:'po_form'},'ฟอร์มใบขอซื้อ (PDF)'),h('select',{id:'po_form',onchange:e=>{ d.form=e.target.value; drawHdr(); }},h('option',{value:'tech',selected:d.form!=='buy'},'ฟอร์มช่าง (ใบขอซื้อจากผู้ใช้)'),h('option',{value:'buy',selected:d.form==='buy'},'ฟอร์มจัดซื้อ (A4 แนวนอน)')))),
+    hdr,
     h('div',{class:'field',style:'max-width:240px;margin-top:8px'},h('label',{for:'po_st'},'สถานะ'),stSel),
     apprBox,
     h('h2',{style:'margin-top:14px'},'รายการสั่งซื้อ'),mix,
