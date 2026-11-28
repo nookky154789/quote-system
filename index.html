@@ -2872,6 +2872,7 @@ async function poCreate(lines,job,note){
   if(await put('po',id,rec)){ purchNotify('po',id); return [{...rec,id}]; }
   return [];
 }
+const poSupShort=p=>{ const n=[...new Set((p.lines||[]).map(l=>String(l.sup||'').trim()).filter(Boolean))]; return n.length>3?n.length+' ร้าน (เปิดดูรายละเอียด)':(n.join(', ')||(!String(p.supplier||'').includes(', ')?p.supplier:'')||'-'); };
 const poSupNames=ls=>[...new Set((ls||[]).map(l=>String(l.sup||'').trim()).filter(Boolean))].join(', ');
 /* เทียบราคา: รายการที่มีหลายร้านที่มีราคา */
 function poCompare(p){
@@ -2907,7 +2908,7 @@ function tPo(p){ const L0=p.lines||[]; const sp=(l)=>String(l.sup||(!String(p.su
   if(save>0) meta.push(['ประหยัดจากการเทียบราคา','สั่งตามร้านที่เลือก ถูกกว่าร้านราคาสูงสุด '+n2(save)+' บาท']);
   if(over>0) meta.push(['หมายเหตุราคา','มีรายการที่ไม่ได้เลือกร้านถูกสุด ส่วนต่างรวม '+n2(over)+' บาท']);
   return {name:'ใบสั่งซื้อ '+p.no,title:'ใบสั่งซื้อ '+p.no,meta,head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]],extra}; }
-function tPoList(){ return {name:'ใบสั่งซื้อ '+nowStamp(),title:'รายการใบสั่งซื้อ',head:['เลขที่','วันที่','ผู้ขาย','งาน','รายการ','มูลค่า','สถานะ'],rows:[...S.po].sort((a,b)=>(b.no||'').localeCompare(a.no||'')).map(p=>[p.no||'',p.date||'',p.supplier||'',p.job||'',(p.lines||[]).length,poTotal(p),(PO_ST[p.status]||[''])[0]])}; }
+function tPoList(){ return {name:'ใบสั่งซื้อ '+nowStamp(),title:'รายการใบสั่งซื้อ',head:['เลขที่','วันที่','ผู้ขาย','งาน','รายการ','มูลค่า','สถานะ'],rows:[...S.po].sort((a,b)=>(b.no||'').localeCompare(a.no||'')).map(p=>[p.no||'',p.date||'',poSupShort(p),p.job||'',(p.lines||[]).length,poTotal(p),(PO_ST[p.status]||[''])[0]])}; }
 let poSelMode=false; const poSel=new Set();
 async function poDelSel(){
   const ids=[...poSel].filter(id=>S.po.some(x=>x.id===id)); if(!ids.length){ toast('ยังไม่ได้เลือกรายการ'); return; }
@@ -2935,7 +2936,7 @@ function vPo(){
       h('button',{class:'btn small danger',disabled:!poSel.size,onclick:poDelSel},'ลบที่เลือก ('+poSel.size+')')):null,
     list.length?h('div',{class:'tablewrap'},h('table',null,h('tr',null,sel?h('th',{style:'width:34px'},''):null,h('th',null,'เลขที่'),h('th',null,'วันที่'),h('th',null,'ผู้ขาย'),h('th',null,'งาน'),h('th',{class:'num'},'รายการ'),h('th',{class:'num'},'มูลค่า'),h('th',null,'สถานะ'),h('th',null,'')),
       list.map(p=>{ const st=PO_ST[p.status]||PO_ST.draft; const tg=()=>{ if(poSel.has(p.id)) poSel.delete(p.id); else poSel.add(p.id); render(); };
-        return h('tr',{style:sel&&poSel.has(p.id)?'background:#fdecea':'',onclick:sel?tg:null},sel?h('td',null,h('input',{type:'checkbox',checked:poSel.has(p.id),'aria-label':'เลือก '+p.no,onclick:e=>e.stopPropagation(),onchange:tg})):null,h('td',{class:'mono'},p.no),h('td',null,thDate(p.date)),h('td',null,p.supplier||'-'),h('td',null,p.job||''),h('td',{class:'num'},(p.lines||[]).length),h('td',{class:'num'},n2(poTotal(p))),h('td',null,h('span',{class:'pill '+st[1]},st[0])),h('td',null,sel?null:h('button',{class:'btn small',onclick:()=>poModal(p)},'เปิด'))); }))):h('div',{class:'empty'},'ยังไม่มีใบสั่งซื้อ — สร้างจากใบเบิกที่ "ไม่มีของในสต็อก" หรือจากของใกล้หมด'));
+        return h('tr',{style:sel&&poSel.has(p.id)?'background:#fdecea':'',onclick:sel?tg:null},sel?h('td',null,h('input',{type:'checkbox',checked:poSel.has(p.id),'aria-label':'เลือก '+p.no,onclick:e=>e.stopPropagation(),onchange:tg})):null,h('td',{class:'mono'},p.no),h('td',null,thDate(p.date)),h('td',null,poSupShort(p)),h('td',null,p.job||''),h('td',{class:'num'},(p.lines||[]).length),h('td',{class:'num'},n2(poTotal(p))),h('td',null,h('span',{class:'pill '+st[1]},st[0])),h('td',null,sel?null:h('button',{class:'btn small',onclick:()=>poModal(p)},'เปิด'))); }))):h('div',{class:'empty'},'ยังไม่มีใบสั่งซื้อ — สร้างจากใบเบิกที่ "ไม่มีของในสต็อก" หรือจากของใกล้หมด'));
 }
 function poModal(src){
   const isNew=!src; const pre=S.settings.poPrefix||'PO';
@@ -2952,8 +2953,8 @@ function poModal(src){
     const names=opts.map(x=>x.name); if(cur&&!names.includes(cur)) names.push(cur);
     return h('select',{'aria-label':'ร้านของรายการนี้',onchange:async e=>{ if(e.target.value==='__new'){ const nm=await askName('ชื่อร้านที่จะสั่ง'); l.sup=(nm||'').trim(); } else l.sup=e.target.value; const sp=supHas(it,l.sup); if(sp) l.price=num(sp.price); draw(); }},h('option',{value:''},'— ไม่ระบุ —'),...names.map(n=>{ const sp=supHas(it,n); return h('option',{value:n,selected:n===cur},n+(sp?' — '+n2(sp.price):'')); }),h('option',{value:'__new'},'+ ระบุร้านอื่น…')); };
   const groups=()=>{ const m=new Map(); d.lines.forEach(l=>{ const k=eff(l); (m.get(k)||m.set(k,[]).get(k)).push(l); }); return m; };
-  function showMix(){ const g=groups(); supInfo.value=g.size?[...g.keys()].map(k=>k||'ไม่ระบุร้าน').join(', '):''; if(g.size<2){ mix.style.display='none'; return; } mix.style.display='';
-    mix.replaceChildren(h('b',null,'ใบนี้มี '+g.size+' ร้าน: '),[...g].map(([k,ls])=>(k||'ไม่ระบุร้าน')+' ('+ls.length+' รายการ)').join(' · '),' — รวมอยู่ในใบเดียว (PDF ใบเดียวพร้อมตารางเทียบราคา)'); }
+  function showMix(){ const g=groups(); const ks=[...g.keys()].map(k=>k||'ไม่ระบุร้าน'); supInfo.value=ks.length>3?ks.length+' ร้าน':ks.join(', '); if(g.size<2){ mix.style.display='none'; return; } mix.style.display='';
+    mix.replaceChildren(h('b',null,'ใบนี้มี '+g.size+' ร้าน — รวมอยู่ในใบเดียว'),' (PDF ใบเดียว มีสรุปยอดตามร้านและตารางเทียบราคา) ',h('details',{style:'margin-top:4px'},h('summary',{style:'cursor:pointer'},'ดูรายชื่อร้านและจำนวนรายการ'),h('div',{style:'max-height:160px;overflow:auto;margin-top:4px'},[...g].sort((a,b)=>b[1].length-a[1].length).map(([k,ls])=>h('div',null,(k||'ไม่ระบุร้าน')+' · '+ls.length+' รายการ'))))); }
   function draw(){
     tb.replaceChildren(...d.lines.map((l,i)=>h('tr',null,h('td',{class:'mono'},l.code||''),h('td',null,l.name,l.itemId?null:h('div',{class:'hint'},'นอกฐานข้อมูล')),
       h('td',{style:'min-width:150px'},supCell(l)),
