@@ -13,7 +13,7 @@
 <style>
 /* Layout: left rail navigation + work area; dense tables, engineering-drawing feel */
 :root{
-  --bg:#f3f5f7; --panel:#ffffff; --ink:#18212b; --muted:#667584; --line:#d8dee4;
+  --bg:#f3f5f7; --panel:#ffffff; --ink:#18212b; --muted:#5c6a78; --line:#d8dee4;
   --accent:#0b6e8a; --accent-ink:#ffffff; --accent-soft:#e1f1f5;
   --good:#1a7f4b; --warn:#b26a00; --bad:#b3261e; --warn-soft:#fff1d6; --bad-soft:#fbe4e2; --good-soft:#dff3e8;
   --font:'IBM Plex Sans Thai','Leelawadee UI','Tahoma',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
@@ -328,7 +328,7 @@ body:before{filter:blur(70px) saturate(1.05)!important;background:
 :root[data-bg="vivid"] body:before{filter:blur(70px) saturate(1.3)!important}
 
 /* focus ที่มองเห็นชัด (หลัง all:unset) */
-nav.rail button:focus-visible,#mtop button:focus-visible,.hm-chip:focus-visible,.todo:focus-visible,.kpi.click:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+nav.rail button:focus-visible,#mtop button:focus-visible,.hm-chip:focus-visible,.todo:focus-visible,.kpi.click:focus-visible,[data-kb]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 /* ลดการเคลื่อนไหว/พื้นหลังเรียบ = ปิดแอนิเมชันและเบลอ */
 @media(prefers-reduced-motion:reduce){body:before{animation:none!important}}
 :root[data-bg="plain"] body:before{display:none}
@@ -370,7 +370,8 @@ function h(tag, attrs, ...kids){
   for (const [k,v] of Object.entries(attrs||{})){
     if (v===false || v==null) continue;
     if (k==='class') el.className = v;
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k.startsWith('on')){ el.addEventListener(k.slice(2), v);
+      if(k==='onclick'&&!/^(button|a|input|select|textarea|label|summary|option)$/i.test(tag)&&!('tabindex' in attrs)&&!/modal-bg/.test(attrs.class||'')){ el.setAttribute('tabindex','0'); el.setAttribute('data-kb','1'); if(!/^(tr|td|th|li)$/i.test(tag)&&!('role' in attrs)) el.setAttribute('role','button'); } }
     else if (k==='value') el.value = v;
     else if (k==='checked' || k==='disabled' || k==='selected') el[k] = !!v;
     else el.setAttribute(k, v === true ? '' : v);
@@ -881,7 +882,7 @@ function mobilize(root){
     t.querySelectorAll('tr:not(.mhead)').forEach(tr=>{ let i=0; [...tr.children].forEach(td=>{ const sp=td.colSpan||1; if(!td.hasAttribute('data-label')) td.setAttribute('data-label',hs[i]||''); i+=sp; }); });
   });
 }
-document.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.tagName!=='BUTTON'){ e.preventDefault(); e.target.click(); } });
+document.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.hasAttribute('data-kb'))&&e.target.tagName!=='BUTTON'){ e.preventDefault(); e.target.click(); } });
 function autoLabel(root){ try{ root.querySelectorAll('input:not([type=hidden]):not([aria-label]):not([aria-labelledby]),select:not([aria-label]):not([aria-labelledby]),textarea:not([aria-label]):not([aria-labelledby])').forEach(el=>{
     if(el.closest('label')||(el.id&&root.querySelector('label[for="'+el.id+'"]'))) return;
     let t=el.getAttribute('placeholder')||el.getAttribute('title')||el.getAttribute('data-label')||'';
