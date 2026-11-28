@@ -824,7 +824,7 @@ function tile(n,l,cls){ return h('div',{class:'card tile'},h('div',{class:'n',st
 
 /* ---------- Items ---------- */
 /* ---------- user display preferences (per user, stored on this device) ---------- */
-const PREF_DEF={menus:{},itemTabs:{list:1,sum:1,hist:1},itemCols:{code:1,name:1,cat:1,cost:1,minp:1,stock:1,status:1,modAt:1,modBy:1},itemLimit:0,histN:20,hist:{req:1,ref:1},
+const PREF_DEF={menus:{},itemTabs:{list:1,sum:1,hist:1},itemCols:{code:1,name:1,cat:1,cost:1,minp:1,stock:1,rop:1,status:1,modAt:1,modBy:1},itemLimit:0,histN:20,hist:{req:1,ref:1},
   sum:{tiles:1,catOut:1,catIn:1,detOut:1,detIn:1,req:1},home:{activity:1},ja:{tasks:1,mats:1,hist:1,note:1,list:1},bomCols:{kind:1,files:1,lines:1,total:1,mod:1}};
 let _pf=null,_raw=null,_pfU='';
 const uiHide=()=>((CU&&CU.perms&&CU.perms._ui&&CU.perms._ui.hide)||{});
@@ -845,7 +845,7 @@ const menuOn=k=>prefs().menus[k]!==0;
 function prefGroups(menus){ return [
   ['เมนูด้านซ้ายที่ต้องการแสดง','menus',menus],
   ['หน้า วัสดุ / สินค้า — แท็บที่แสดง','itemTabs',[['list','รายการวัสดุ'],['sum','สรุปรับเข้า / เบิกออก'],['hist','ประวัติรับ-จ่ายล่าสุด']]],
-  ['หน้า วัสดุ / สินค้า — คอลัมน์ในตารางรายการ','itemCols',[['code','รหัส'],['name','ชื่อ'],['cat','หมวด'],['cost','ต้นทุน'],['minp','ต่ำสุดจากร้าน'],['stock','คงเหลือ'],['status','สถานะ'],['modAt','แก้ไขเมื่อ'],['modBy','แก้ไขโดย']]],
+  ['หน้า วัสดุ / สินค้า — คอลัมน์ในตารางรายการ','itemCols',[['code','รหัส'],['name','ชื่อ'],['cat','หมวด'],['cost','ต้นทุน'],['minp','ต่ำสุดจากร้าน'],['stock','คงเหลือ'],['rop','เงื่อนไขสต๊อก / ขั้นต่ำ'],['status','สถานะ'],['modAt','แก้ไขเมื่อ'],['modBy','แก้ไขโดย']]],
   ['สรุปรับเข้า / เบิกออก — ส่วนที่แสดง','sum',[['tiles','กล่องสรุปยอด'],['catOut','ตารางหมวด (เบิกออก)'],['catIn','ตารางหมวด (รับเข้า)'],['detOut','รายละเอียดที่เบิกออก'],['detIn','รายละเอียดที่รับเข้า'],['req','คอลัมน์ผู้เบิก / ผู้รับเข้า']]],
   ['หน้าภาพรวม — ส่วนที่แสดง','home',[['activity','ใครทำอะไรล่าสุด']]],
   ['หน้า มอบหมายงาน — ส่วนที่แสดงในใบงาน','ja',[['tasks','งานที่ต้องทำ'],['mats','รายการวัสดุ'],['hist','ประวัติการเบิก'],['note','หมายเหตุ'],['list','ความคืบหน้าในตาราง']]],
@@ -1273,6 +1273,12 @@ async function autoCatApply(){
   await lsSave(); render(); toast('จัดหมวดแล้ว '+n0(pl.hit)+' รายการ');
 }
 let _itemList=[];
+function ropCell(i){
+  const m=i.ropMode, mn=num(i.min);
+  const lbl=m?ROP_MODE_TH[m]||m:(mn>0?'แมนนวล':'ยังไม่ตั้ง');
+  const cls=m==='auto'?'good':(m==='manual'||(!m&&mn>0))?'warn':'';
+  return h('div',null,h('span',{class:'pill '+cls,title:m==='auto'?'คำนวณตามสูตร ROP/EOQ':m==='manual'?'กำหนดเอง':''},lbl),' ',h('b',null,mn>0?'ขั้นต่ำ '+n0(mn):(m==='spare'||m==='none'?'ไม่แจ้งเตือน':'—')),num(i.buyQty)>0&&mn>0?h('div',{class:'hint'},'สั่งครั้งละ '+n0(i.buyQty)):null);
+}
 function renderItemRows(){
   const wrap=$('#itemwrap'); if(!wrap) return;
   const q=itemQ.trim().toLowerCase();
@@ -1283,7 +1289,7 @@ function renderItemRows(){
   if(!list.length){ wrap.replaceChildren(h('div',{class:'empty'},S.items.length?'ไม่พบรายการที่ค้นหา':'ยังไม่มีวัสดุ กด "เพิ่มวัสดุ" หรือ "นำเข้าจากตาราง" เพื่อวางจาก Excel')); return; }
   const total=list.length; const shown=itemLimit?list.slice(0,itemLimit):list;
   wrap.replaceChildren(h('table',null,
-    h('tr',null,h('th',null,'รหัส'),h('th',null,'ชื่อ'),h('th',null,'หมวด'),h('th',{class:'num'},'ต้นทุน'),h('th',{class:'num'},'ต่ำสุดจากร้าน'),h('th',{class:'num'},'คงเหลือ'),h('th',null,'สถานะ'),h('th',null,'แก้ไขเมื่อ'),h('th',null,'แก้ไขโดย'),h('th',null,'')),
+    h('tr',null,h('th',null,'รหัส'),h('th',null,'ชื่อ'),h('th',null,'หมวด'),h('th',{class:'num'},'ต้นทุน'),h('th',{class:'num'},'ต่ำสุดจากร้าน'),h('th',{class:'num'},'คงเหลือ'),h('th',null,'เงื่อนไขสต๊อก / ขั้นต่ำ'),h('th',null,'สถานะ'),h('th',null,'แก้ไขเมื่อ'),h('th',null,'แก้ไขโดย'),h('th',null,'')),
     shown.map(i=>{
       const low=num(i.min)>0 && num(i.stock)<=num(i.min);
       const mp=minPrice(i);
@@ -1291,12 +1297,13 @@ function renderItemRows(){
         h('td',{class:'num'},n2(i.cost)),
         h('td',{class:'num'},mp?n2(mp):'-'),
         h('td',{class:'num'},n0(i.stock)+' '+(i.unit||''),whText(i)?h('div',{class:'hint',style:'white-space:normal'},whText(i)):null),
+        h('td',{style:'white-space:nowrap'},ropCell(i)),
         h('td',null,num(i.stock)<=0?h('span',{class:'pill bad'},'หมด'):low?h('span',{class:'pill warn'},'ใกล้หมด'):h('span',{class:'pill good'},'ปกติ')),
         h('td',{style:'white-space:nowrap'},modDate(i.modAt)),h('td',null,i.modBy||''),
         h('td',{class:'acts',style:'min-width:150px'},canEdit('items')?h('button',{class:'btn small',onclick:()=>receiveModal(i)},'รับเข้า'):null,' ',canEdit('items')?h('button',{class:'btn small',title:'ตั้งจำนวนขั้นต่ำ — แจ้งเตือน LINE ทันทีเมื่อต่ำกว่า',onclick:()=>itemMinModal(i)},(Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)?'⚠ ':'')+'ขั้นต่ำ'):null,' ',h('button',{class:'btn small',onclick:()=>itemModal(i)},'แก้ไข')));
     }),
-    h('tr',null,h('td',{colspan:10,class:'hint',style:'text-align:center'},`แสดง ${n0(shown.length)} จาก ${n0(total)} รายการ`+(shown.length<total?' (เลือก "แสดงทั้งหมด" ด้านบนเพื่อดูครบ)':'')))));
-  { const ic=prefs().itemCols; hideCols(wrap,['code','name','cat','cost','minp','stock','status','modAt','modBy'].map((c,ix)=>ic[c]===0?ix:-1).filter(x=>x>=0)); }
+    h('tr',null,h('td',{colspan:11,class:'hint',style:'text-align:center'},`แสดง ${n0(shown.length)} จาก ${n0(total)} รายการ`+(shown.length<total?' (เลือก "แสดงทั้งหมด" ด้านบนเพื่อดูครบ)':'')))));
+  { const ic=prefs().itemCols; hideCols(wrap,['code','name','cat','cost','minp','stock','rop','status','modAt','modBy'].map((c,ix)=>ic[c]===0?ix:-1).filter(x=>x>=0)); }
 }
 function itemModal(it){
   const d = it ? JSON.parse(JSON.stringify(it)) : {id:uid(),code:'',name:'',unit:'ชิ้น',category:'',cost:0,stock:0,min:0,suppliers:[]};
