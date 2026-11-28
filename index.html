@@ -879,24 +879,101 @@ function itemSortFn(k){
     cost_d:(a,b)=>num(b.cost)-num(a.cost),cost_a:(a,b)=>num(a.cost)-num(b.cost),stock_d:(a,b)=>num(b.stock)-num(a.stock),stock_a:(a,b)=>num(a.stock)-num(b.stock),
     low:(a,b)=>((num(a.min)>0?num(a.stock)/num(a.min):1e9)-(num(b.min)>0?num(b.stock)/num(b.min):1e9))}[k]||(()=>0);
 }
+/* ===== จุดสั่งซื้อ ROP / EOQ (พอร์ตจากไฟล์ "จุดสั่งซื้อ" — ตรวจเทียบกับค่าในไฟล์แล้วครบทุกแถว) ===== */
+const ROP_MODES=[['auto','อัตโนมัติ — คำนวณตามสูตร'],['manual','แมนนวล — กำหนดเอง'],['spare','อะไหล่สำรอง — ไม่แจ้งเตือน'],['none','ไม่สต๊อก — ไม่แจ้งเตือน']];
+const ROP_MODE_TH={auto:'อัตโนมัติ',manual:'แมนนวล',spare:'อะไหล่สำรอง',none:'ไม่สต๊อก'};
+function ropZ(sl){ return sl>=.999?3.09:sl>=.99?2.33:sl>=.975?1.96:sl>=.95?1.65:1.28; }
+function ropAuto(o){
+  const u=+o.usage||0, c=+o.cost||0, LT=+o.lt||14, z=ropZ(+o.sl||.9);
+  const ns=(u<=2&&c>2500), d=u/312, sd=Math.sqrt(d), sLT=.15*LT;
+  const ss=(ns||u<=6)?0:Math.ceil(z*Math.sqrt(LT*sd*sd+d*d*sLT*sLT)-1e-9);
+  const rop=ns?0:(u<=6?1:Math.ceil(d*LT+ss-1e-9));
+  const eoq=(ns||c<=0)?0:(u<=6?1:Math.ceil(Math.max(1.5*u/12,Math.min(Math.sqrt(2*u*300/(c*.2)),1.5*u/12))-1e-9));
+  return {ss,rop,eoq};
+}
+function ropPack(e,p){ p=+p||0; return p>1&&e>0?Math.ceil(e/p-1e-9)*p:e; }
+function ropFinal(o){
+  const m=o.mode;
+  if(m==='manual') return {rop:Math.max(0,+o.ropMan||0),eoq:Math.max(0,+o.eoqMan||0),ss:0};
+  if(m==='spare') return {rop:0,eoq:1,ss:0};
+  if(m==='none') return {rop:0,eoq:0,ss:0};
+  const a=ropAuto(o); return {rop:a.rop,eoq:ropPack(a.eoq,o.pack),ss:a.ss};
+}
+function ropIn(it,ov){ return Object.assign({mode:it.ropMode||'manual',usage:it.ropUse,cost:num(it.cost)||num(it.ropCost),lt:it.ropLt,sl:it.ropSl,pack:it.ropPack,ropMan:it.ropMan!=null?it.ropMan:it.min,eoqMan:it.eoqMan!=null?it.eoqMan:it.buyQty},ov||{}); }
+function ropApply(it){ const f=ropFinal(ropIn(it)); it.min=f.rop; if(f.eoq>0) it.buyQty=f.eoq; else delete it.buyQty; return f; }
+let _ropStd=null;
+async function ropStdLoad(){
+  if(_ropStd) return _ropStd;
+  if(typeof SB==='undefined'||!SB) throw new Error('ต้องเชื่อมต่อระบบออนไลน์');
+  const r=await SB.from('records').select('data').eq('col','settings').eq('id','ropstd').maybeSingle();
+  if(r.error) throw r.error; if(!r.data||!r.data.data||!r.data.data.rows) throw new Error('ไม่พบข้อมูลมาตรฐานบนระบบ');
+  return (_ropStd=r.data.data.rows);
+}
+async function ropLoadStd(){
+  if(!needEdit('items')) return;
+  let rows; try{ rows=await ropStdLoad(); }catch(e){ toast('โหลดค่ามาตรฐานไม่สำเร็จ: '+errMsg(e),6000); return; }
+  const byCode=new Map(S.items.map(i=>[String(i.code||''),i])); const hit=[]; let miss=0, hadMin=0;
+  for(const [code,r] of Object.entries(rows)){ const it=byCode.get(code); if(it){ hit.push([it,r]); if(num(it.min)>0) hadMin++; } else miss++; }
+  if(!hit.length){ toast('ไม่พบรหัสสินค้าที่ตรงกับค่ามาตรฐานเลย'); return; }
+  if(!await ask('โหลดค่ามาตรฐานจากไฟล์จุดสั่งซื้อ (ROP/EOQ)\n• ตรงกับสินค้าในระบบ '+n0(hit.length)+' รายการ → ตั้งโหมด/ขั้นต่ำ/จำนวนสั่ง ตามไฟล์'+(hadMin?'\n• '+n0(hadMin)+' รายการที่เคยตั้งขั้นต่ำไว้จะถูกแทนที่':'')+'\n• ไม่พบในระบบ '+n0(miss)+' รายการ (ข้ามไป)\nสินค้าที่ไม่อยู่ในรายการนี้จะไม่ถูกแก้ไข','โหลดค่ามาตรฐาน')) return;
+  let ch=0;
+  hit.forEach(([it,r])=>{ const [mode,use,lt,sl,pack,rm,em]=r; const o0=it.min+'|'+it.buyQty;
+    it.ropMode=mode; it.ropUse=use; it.ropLt=lt; it.ropSl=sl; if(pack>0) it.ropPack=pack; else delete it.ropPack; it.ropMan=rm; it.eoqMan=em; if(!num(it.cost)&&r[9]>0) it.ropCost=r[9];
+    ropApply(it); if(o0!==it.min+'|'+it.buyQty) ch++; });
+  await lsSave(); render(); toast('โหลดค่ามาตรฐานแล้ว '+n0(hit.length)+' รายการ (ขั้นต่ำเปลี่ยน '+n0(ch)+') · ไม่พบรหัส '+n0(miss),6000);
+}
+async function ropRecalc(){
+  if(!needEdit('items')) return;
+  const list=S.items.filter(i=>i.ropMode==='auto'); if(!list.length){ toast('ยังไม่มีสินค้าโหมดอัตโนมัติ — กด "โหลดค่ามาตรฐาน" หรือเลือกโหมดในแต่ละรายการ'); return; }
+  let ch=0; list.forEach(it=>{ const o0=it.min+'|'+it.buyQty; ropApply(it); if(o0!==it.min+'|'+it.buyQty) ch++; });
+  if(!ch){ toast('ค่าอัตโนมัติเป็นปัจจุบันแล้ว ('+n0(list.length)+' รายการ)'); return; }
+  await lsSave(); render(); toast('คำนวณใหม่ '+n0(list.length)+' รายการ — เปลี่ยน '+n0(ch)+' รายการ');
+}
 function itemMinModal(it){
   if(!canEdit('items')) return;
-  const rc=((S.settings||{}).lowStockUsers||[]).filter(Boolean); const nameOf=id=>((TEAM||[]).find(u=>u.id===id)||{}).name||'?';
-  const inp=h('input',{type:'number',min:'0',step:'any',value:it.min||'',id:'imin',style:'max-width:200px'});
-  const inpBuy=h('input',{type:'number',min:'0',step:'any',value:num(it.buyQty)>0?it.buyQty:'',id:'ibuy',style:'max-width:200px'});
-
+  const nameOf=id=>((TEAM||[]).find(u=>u.id===id)||{}).name||'?';
+  const mode0=it.ropMode||'manual';
+  const sel=h('select',{id:'imode'},...ROP_MODES.map(([k,t])=>h('option',{value:k,selected:k===mode0},t)));
+  const numIn=(id,v,ph)=>h('input',{type:'number',min:'0',step:'any',value:v!=null&&v!==''&&num(v)!==0?v:'',id,placeholder:ph||'',style:'max-width:200px',oninput:()=>refresh()});
+  const inMin=numIn('imin',mode0==='manual'?(it.ropMan!=null?it.ropMan:it.min):'');
+  const inBuy=numIn('ibuy',mode0==='manual'?(it.eoqMan!=null?it.eoqMan:it.buyQty):'','เว้นว่าง = อัตโนมัติ');
+  const inUse=numIn('iuse',it.ropUse,'จำนวนที่ใช้ต่อปี');
+  const inLt=numIn('ilt',it.ropLt,'14');
+  const inSl=h('select',{id:'isl',onchange:()=>refresh()},...[[.9,'90% (กลุ่ม C)'],[.95,'95% (กลุ่ม B)'],[.975,'97.5% (กลุ่ม A)'],[.99,'99%']].map(([v,t])=>h('option',{value:v,selected:Math.abs((+it.ropSl||.9)-v)<1e-9},t)));
+  const inPack=numIn('ipack',it.ropPack,'ถ้ามี (ปัดจำนวนสั่งเป็นชุด)');
+  const box=h('div',null), prev=h('div',{class:'hint',style:'margin:8px 0;padding:8px;border-radius:8px;background:rgba(0,0,0,.05)'});
+  const cur=()=>({mode:sel.value,usage:num(inUse.value),cost:num(it.cost)||num(it.ropCost),lt:num(inLt.value)||14,sl:+inSl.value,pack:num(inPack.value),ropMan:num(inMin.value),eoqMan:num(inBuy.value)});
+  function refresh(){
+    const m=sel.value, f=ropFinal(cur());
+    box.style.display=m==='auto'?'':'none'; inMin.parentNode.style.display=m==='manual'?'':'none'; inBuy.parentNode.style.display=m==='manual'?'':'none';
+    const lowNow=f.rop>0&&(Number(it.stock)||0)<=f.rop;
+    prev.replaceChildren(document.createTextNode(m==='spare'?'อะไหล่สำรอง: ไม่แจ้งเตือน (ขั้นต่ำ 0)':m==='none'?'ไม่สต๊อก: ไม่แจ้งเตือน (ขั้นต่ำ 0)':'ผลลัพธ์: ขั้นต่ำ (ROP) = '+n0(f.rop)+' · จำนวนที่ควรสั่ง (EOQ) = '+(f.eoq>0?n0(f.eoq):'อัตโนมัติ')+(m==='auto'?' · Safety stock = '+n0(f.ss):'')+(lowNow?' → ตอนนี้คงเหลือต่ำกว่าขั้นต่ำ':'')));
+  }
+  sel.onchange=refresh;
+  box.append(h('div',{class:'field'},h('label',{for:'iuse'},'ยอดใช้ต่อปี (ชิ้น)'),inUse),h('div',{class:'field'},h('label',{for:'ilt'},'Lead time (วัน) — ค่าเริ่มต้น 14'),inLt),h('div',{class:'field'},h('label',{for:'isl'},'Service level'),inSl),h('div',{class:'field'},h('label',{for:'ipack'},'ขนาดแพ็ก/ชุด (ถ้ามี)'),inPack),
+    h('p',{class:'hint'},'สูตร: ROP = ยอดใช้/วัน × LT + Safety stock (Z × √(LT·σd² + d²·σLT²)) · EOQ ตามต้นทุนสั่งซื้อ 300 บาท/ครั้ง ต้นทุนถือครอง 20%'+(num(it.cost)||num(it.ropCost)?'':' · สินค้านี้ยังไม่มีราคา — EOQ จะเว้นว่าง')));
   const la=it.lowAlert, acks=la&&la.acks?Object.keys(la.acks):[];
-  const lowNow=Number(it.min)>0&&(Number(it.stock)||0)<=Number(it.min);
-  const save=async()=>{ const v=Math.max(0,num(inp.value)); const bq=Math.max(0,num(inpBuy.value)); const nr=strip({...it,min:v,buyQty:bq>0?bq:undefined}); if(bq<=0) delete nr.buyQty; if(!await put('items',it.id,nr)) return; it.min=v; if(bq>0) it.buyQty=bq; else delete it.buyQty; closeModal(); toast(v>0?('ตั้งขั้นต่ำ '+n0(v)+' '+(it.unit||'')+' แล้ว'+((Number(it.stock)||0)<=v?' — ต่ำกว่าขั้นต่ำ จะแจ้ง LINE ในรอบแจ้งเตือนประจำวัน':'')):'ยกเลิกขั้นต่ำแล้ว'); render(); };
-  openModal('ตั้งจำนวนขั้นต่ำ',h('div',null,
+  const save=async()=>{
+    const nr={...it}; delete nr.id; const m=sel.value;
+    nr.ropMode=m; if(m==='auto'){ nr.ropUse=num(inUse.value); nr.ropLt=num(inLt.value)||14; nr.ropSl=+inSl.value; if(num(inPack.value)>0) nr.ropPack=num(inPack.value); else delete nr.ropPack; }
+    if(m==='manual'){ nr.ropMan=Math.max(0,num(inMin.value)); nr.eoqMan=Math.max(0,num(inBuy.value)); }
+    const f=ropFinal(ropIn(nr)); nr.min=f.rop; if(f.eoq>0) nr.buyQty=f.eoq; else delete nr.buyQty;
+    if(!await put('items',it.id,nr)) return;
+    Object.keys(it).forEach(k=>{ if(k!=='id') delete it[k]; }); Object.assign(it,nr);
+    closeModal(); toast(f.rop>0?('ตั้งขั้นต่ำ '+n0(f.rop)+' '+(it.unit||'')+' แล้ว ('+ROP_MODE_TH[m]+')'+((Number(it.stock)||0)<=f.rop?' — ตอนนี้ต่ำกว่าขั้นต่ำ ระบบจะแจ้งเตือนในสรุปประจำวัน':'')):'ปิดการแจ้งเตือนของรายการนี้แล้ว ('+ROP_MODE_TH[m]+')');
+  };
+  openModal('ตั้งจุดสั่งซื้อ / ขั้นต่ำ',h('div',null,
     h('div',{style:'font-weight:700'},it.name||''),h('div',{class:'mono hint'},it.code||''),
-    h('p',null,'คงเหลือตอนนี้: ',h('b',{style:lowNow?'color:#c0392b':''},n0(it.stock)+' '+(it.unit||''))),
-    h('div',{class:'field'},h('label',{for:'imin'},'จำนวนขั้นต่ำ (จุดสั่งซื้อ)'),inp),
-    h('div',{class:'field'},h('label',{for:'ibuy'},'จำนวนที่ควรซื้อเพิ่ม (เว้นว่าง = อัตโนมัติ ให้ถึง 2 เท่าของขั้นต่ำ)'),inpBuy),
-    h('p',{class:'hint'},'เมื่อคงเหลือเท่ากับหรือต่ำกว่าค่านี้ ระบบจะรวมรายการนี้ในการแจ้งเตือน LINE ประจำวัน (วันละครั้ง ตามเวลาที่ตั้งในหน้าตั้งค่า) พร้อมปุ่ม "รับทราบ" — กดรับทราบแล้วจะไม่เตือนรายการนี้ซ้ำ'),
-    lowNow?h('p',{class:'hint'},la&&la.at?('แจ้งครั้งล่าสุด '+logTs(la.at)+' · รับทราบแล้ว: '+(acks.length?acks.map(nameOf).join(', '):'ยังไม่มี')):'อยู่ในสถานะต่ำกว่าขั้นต่ำ'):null),
+    h('p',null,'คงเหลือตอนนี้: ',h('b',null,n0(it.stock)+' '+(it.unit||''))),
+    h('div',{class:'field'},h('label',{for:'imode'},'โหมด'),sel),
+    box,
+    h('div',{class:'field'},h('label',{for:'imin'},'จำนวนขั้นต่ำ (จุดสั่งซื้อ)'),inMin),
+    h('div',{class:'field'},h('label',{for:'ibuy'},'จำนวนที่ควรซื้อเพิ่ม (เว้นว่าง = อัตโนมัติ ให้ถึง 2 เท่าของขั้นต่ำ)'),inBuy),
+    prev,
+    h('p',{class:'hint'},'เมื่อคงเหลือเท่ากับหรือต่ำกว่าขั้นต่ำ ระบบรวมรายการนี้ในการแจ้งเตือน LINE ประจำวัน (ตามเวลาที่ตั้งในหน้าตั้งค่า) พร้อมปุ่มรับทราบ และแจ้งทันทีเมื่อจำนวนลดลงจนต่ำกว่าขั้นต่ำ'),
+    la&&la.at&&(Number(it.min)>0&&(Number(it.stock)||0)<=Number(it.min))?h('p',{class:'hint'},'แจ้งครั้งล่าสุด '+logTs(la.at)+' · รับทราบแล้ว: '+(acks.length?acks.map(nameOf).join(', '):'ยังไม่มี')):null),
     [h('button',{class:'btn',onclick:closeModal},'ยกเลิก'),h('button',{class:'btn primary',onclick:save},'บันทึก')]);
-  setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(e){} },50);
+  refresh();
 }
 function lowItems(){ return S.items.filter(i=>Number(i.min)>0&&(Number(i.stock)||0)<=Number(i.min)).sort((a,b)=>((Number(a.stock)||0)/Number(a.min))-((Number(b.stock)||0)/Number(b.min))); }
 let _msQ='', _msF='set';
@@ -924,8 +1001,8 @@ async function minStockModal(){
     list.replaceChildren(shown.length?h('table',null,h('thead',null,h('tr',null,h('th',null,'รหัส / ชื่อ'),h('th',{class:'num'},'คงเหลือ'),h('th',{class:'num'},'ขั้นต่ำ (จุดสั่งซื้อ)'))),h('tbody',null,...shown.map(it=>{
       const lowNow=Number(it.min)>0&&(Number(it.stock)||0)<=Number(it.min);
       const inp=h('input',{type:'number',min:'0',step:'any',value:it.min||'',style:'width:90px;text-align:right','aria-label':'ขั้นต่ำของ '+(it.code||it.name),
-        onchange:async e=>{ const v=Math.max(0,num(e.target.value)); const rec=strip({...it,min:v}); if(await put('items',it.id,rec)){ it.min=v; toast(v>0?'ตั้งขั้นต่ำ '+n0(v)+' แล้ว':'ยกเลิกขั้นต่ำแล้ว'); draw(); } else e.target.value=it.min||''; }});
-      return h('tr',null,h('td',null,h('div',{class:'mono'},it.code||''),h('div',null,it.name||'')),h('td',{class:'num',style:lowNow?'color:#c0392b;font-weight:700':''},n0(it.stock)+' '+(it.unit||'')),h('td',{class:'num'},inp));
+        onchange:async e=>{ const v=Math.max(0,num(e.target.value)); const rec=strip({...it,min:v,ropMode:'manual',ropMan:v}); if(await put('items',it.id,rec)){ it.min=v; it.ropMode='manual'; it.ropMan=v; toast(v>0?'ตั้งขั้นต่ำ '+n0(v)+' แล้ว':'ยกเลิกขั้นต่ำแล้ว'); draw(); } else e.target.value=it.min||''; }});
+      return h('tr',null,h('td',null,h('div',{class:'mono'},it.code||''),h('div',null,it.name||''),it.ropMode?h('div',{class:'hint'},'โหมด: '+(ROP_MODE_TH[it.ropMode]||it.ropMode)+(num(it.ropUse)>0?' · ใช้ '+n0(it.ropUse)+'/ปี':'')):null),h('td',{class:'num',style:lowNow?'color:#c0392b;font-weight:700':''},n0(it.stock)+' '+(it.unit||'')),h('td',{class:'num'},inp));
     }))):h('div',{class:'empty'},_msF==='set'?'ยังไม่ได้ตั้งขั้นต่ำให้สินค้าใด — กด "ทุกรายการ" แล้วค้นหาสินค้าเพื่อตั้งค่า':'ไม่พบรายการ'));
   }
   draw();
@@ -938,6 +1015,8 @@ async function minStockModal(){
   };
   openModal('🔔 สินค้าขั้นต่ำ / แจ้งเตือน',h('div',null,h('p',{class:'hint'},'ตั้ง "ขั้นต่ำ" ให้สินค้าที่ต้องเฝ้าดู เมื่อคงเหลือเท่ากับหรือต่ำกว่าค่านี้ ระบบจะแจ้งคนที่กำหนดทาง LINE'),info,q,fb,cnt,list),[
     h('button',{class:'btn',onclick:closeModal},'ปิด'),
+    h('button',{class:'btn',title:'ตั้งโหมด/ขั้นต่ำ/จำนวนสั่ง ตามไฟล์จุดสั่งซื้อ (ROP/EOQ)',onclick:async()=>{ await ropLoadStd(); draw(); }},'📥 โหลดค่ามาตรฐาน ROP'),
+    h('button',{class:'btn',title:'คำนวณใหม่เฉพาะรายการโหมดอัตโนมัติ',onclick:async()=>{ await ropRecalc(); draw(); }},'↻ คำนวณอัตโนมัติใหม่'),
     h('button',{class:'btn primary',onclick:sendNow},'📲 ส่งแจ้งเตือนเดี๋ยวนี้')]);
 }
 let _lowF='all', _lowQ='';
