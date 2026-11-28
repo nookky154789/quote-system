@@ -2907,7 +2907,43 @@ function tPo(p){ const L0=p.lines||[]; const sp=(l)=>String(l.sup||(!String(p.su
   const meta=[['วันที่',thDate(p.date)],['ผู้ขาย',names.length>3?names.length+' ร้าน (ดูสรุปยอดแยกตามร้านท้ายเอกสาร)':(names.join(', ')||p.supplier||'-')],['อ้างอิงงาน',p.job||'-'],['สถานะ',(PO_ST[p.status]||[''])[0]]];
   if(save>0) meta.push(['ประหยัดจากการเทียบราคา','สั่งตามร้านที่เลือก ถูกกว่าร้านราคาสูงสุด '+n2(save)+' บาท']);
   if(over>0) meta.push(['หมายเหตุราคา','มีรายการที่ไม่ได้เลือกร้านถูกสุด ส่วนต่างรวม '+n2(over)+' บาท']);
-  return {name:'ใบสั่งซื้อ '+p.no,title:'ใบสั่งซื้อ '+p.no,meta,head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]],extra}; }
+  return {name:'ใบขอซื้อ '+p.no,title:'ใบขอซื้อ '+p.no,meta,head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]],extra,html:poFormHtml(p,L,sp,sm,cmp,save,over)}; }
+function poFormHtml(p,L,sp,sm,cmp,save,over){
+  const g=new Map(); L.forEach(l=>{ const k=sp(l)||'ไม่ระบุร้าน'; (g.get(k)||g.set(k,[]).get(k)).push(l); });
+  const multi=g.size>1; let no=0, body='';
+  g.forEach((ls,k)=>{ let sub=0;
+    body+=`<tr class="sup"><td colspan="6"><b>${esc(k)}</b><span>${ls.length} รายการ</span></td></tr>`;
+    ls.forEach(l=>{ const t=num(l.qty)*num(l.price); sub+=t; no++;
+      body+=`<tr><td class="c">${no}</td><td>${esc((l.code?l.code+'  ':'')+(l.name||''))}</td><td class="c">${n0(l.qty)} ${esc(l.unit||'')}</td><td class="r">${n2(l.price)}</td><td class="r">${n2(t)}</td><td class="c">${l.need?esc(thDate(l.need)||l.need):''}</td></tr>`; });
+    if(multi) body+=`<tr class="st"><td colspan="4" class="r">รวม ${esc(k)}</td><td class="r">${n2(sub)}</td><td></td></tr>`; });
+  body+=`<tr class="st"><td colspan="4" class="r big">รวมทั้งสิ้น (บาท)</td><td class="r big">${n2(poTotal(p))}</td><td></td></tr>`;
+  const fl=(a,v,r)=>`<div class="f"><b${r?' class="rq"':''}>${a}</b><span>${esc(v||'')}</span></div>`;
+  const sg=[['ผู้ขอซื้อ',p.requester||p.by||''],['ผู้รับผิดชอบ',''],['ผู้ตรวจ',(p.appr&&p.appr.by)||''],['ผู้จัดซื้อ','']].map(([a,b])=>`<div class="sg"><div>${a}</div><small>${b?'('+esc(b)+')':''}</small><div class="dt">วันที่ ____/____/____</div></div>`).join('');
+  let ap='';
+  if(g.size>1) ap+=`<h3>สรุปยอดแยกตามร้าน (${g.size} ร้าน)</h3><table class="ap"><tr><th>ร้าน</th><th>จำนวนรายการ</th><th>ยอดรวม (บาท)</th></tr>${[...sm].sort((a,b)=>b[1].t-a[1].t).map(([k,a])=>`<tr><td>${esc(k)}</td><td class="r">${a.n}</td><td class="r">${n2(a.t)}</td></tr>`).join('')}<tr class="st"><td>รวมทุกร้าน</td><td class="r">${L.length}</td><td class="r">${n2(poTotal(p))}</td></tr></table>`;
+  if(cmp.length) ap+=`<h3>เปรียบเทียบราคาร้านค้า (${cmp.length} รายการที่มีหลายร้าน)</h3><div class="hn">[เลือก] = ร้านที่ใช้สั่งในใบนี้ · ส่วนต่างเทียบกับร้านราคาต่ำสุด</div><table class="ap">${cmp.map(c=>{ const lo=c.offers[0].price,q=num(c.l.qty),ch=sp(c.l); return `<tr class="ch"><td colspan="4">${esc((c.l.code?c.l.code+'  ':'')+(c.l.name||''))} (สั่ง ${n0(q)} ${esc(c.l.unit||'')})</td></tr>`+c.offers.map((o,j)=>`<tr><td>${esc(o.name)}${o.name===ch?' <b>[เลือก]</b>':''}</td><td class="r">${n2(o.price)}</td><td class="r">${n2(o.price*q)}</td><td class="r ${j?'bad':'ok'}">${j?'+'+n2(o.price-lo)+' (+'+(lo>0?Math.round((o.price/lo-1)*100):0)+'%)':'ต่ำสุด'}</td></tr>`).join(''); }).join('')}</table>`+(save>0?`<p class="ok r"><b>สั่งตามร้านที่เลือก ประหยัดกว่าร้านราคาสูงสุด ${n2(save)} บาท</b></p>`:'')+(over>0?`<p class="bad r">มีรายการที่ไม่ได้เลือกร้านถูกสุด ส่วนต่างรวม ${n2(over)} บาท</p>`:'');
+  return `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>ใบขอซื้อ ${esc(p.no||'')}</title><style>
+@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{font:12px/1.4 Tahoma,'Leelawadee UI','Noto Sans Thai',sans-serif;color:#111;margin:0}
+.box{border:2px solid #111;display:flex;flex-direction:column;min-height:277mm}
+h1{font-size:17px;text-align:center;margin:0;padding:10px 0;border-bottom:1.5px solid #111}
+.hd{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;padding:8px 10px;border-bottom:1.5px solid #111}
+.f{display:flex;gap:4px;border-bottom:1px solid #aaa;min-height:18px}.f b{white-space:nowrap}.f b.rq{color:#d91a1a}.f span{flex:1}
+table.m{width:100%;border-collapse:collapse;flex:1}table.m th,table.m td{border:1px solid #111;border-top:0;padding:3px 5px;vertical-align:top}table.m th{border-top:1px solid #111;text-align:center;font-weight:700}
+.c{text-align:center}.r{text-align:right}tr{page-break-inside:avoid}
+tr.sup td{background:#e0eaf1;color:#0f6e84;border-left:1px solid #111}tr.sup span{float:right;color:#777;font-size:11px}
+tr.st td{font-weight:700;color:#444}tr.st td.big{font-size:13px;color:#111}th.rd{color:#d91a1a}
+td.fill{height:100%}.sgs{display:grid;grid-template-columns:repeat(4,1fr);border-top:1.5px solid #111;height:26mm}
+.sg{border-left:1px solid #111;text-align:center;padding-top:6px;position:relative}.sg:first-child{border-left:0}.sg small{display:block;color:#666}.sg .dt{position:absolute;left:6px;bottom:5px;font-size:11px}
+.pb{page-break-before:always;padding:4px}h3{font-size:13px;margin:12px 0 4px;color:#0f6e84}.hn{font-size:10px;color:#777;margin-bottom:4px}
+table.ap{width:100%;border-collapse:collapse}table.ap th,table.ap td{border-bottom:1px solid #ccc;padding:3px 5px}table.ap th{background:#e0eaf1;text-align:left}tr.ch td{background:#e0eaf1;font-weight:700}
+.ok{color:#1a7f4b}.bad{color:#d91a1a}</style></head><body>
+<div class="box"><h1>ใบขอซื้อจากผู้ใช้ (PURCHASE REQUEST FROM USER)</h1>
+<div class="hd">${fl('*ชื่อลูกค้า :',p.customer,1)}${fl('*ชื่องาน :',p.job,1)}${fl('*ชื่อเครื่อง :',p.machine,1)}${fl('*เลขที่JA.',p.jaNo,1)}${fl('แผนก :',p.dept)}${fl('*วันที่ขอซื้อ :',thDate(p.date),1)}${fl('PR.NO (จัดซื้อ) :',p.no)}</div>
+<table class="m"><thead><tr><th rowspan="2" style="width:34px">ลำดับ</th><th rowspan="2">รายการสินค้า</th><th colspan="3">จำนวนที่ขอซื้อใหม่</th><th rowspan="2" class="rd" style="width:80px">วันที่ต้องการใช้</th></tr><tr><th style="width:62px">จำนวน</th><th style="width:70px">ราคา/หน่วย</th><th style="width:76px">ราคารวม</th></tr></thead><tbody>${body}<tr><td class="fill"></td><td></td><td></td><td></td><td></td><td></td></tr></tbody></table>
+<div class="sgs">${sg}</div></div>
+${ap?`<div class="pb"><h2 style="margin:0 0 6px">เอกสารแนบ — สรุปยอดและเปรียบเทียบราคา · ${esc(p.no||'')}</h2>${ap}</div>`:''}
+</body></html>`;
+}
 function tPoList(){ return {name:'ใบสั่งซื้อ '+nowStamp(),title:'รายการใบสั่งซื้อ',head:['เลขที่','วันที่','ผู้ขาย','งาน','รายการ','มูลค่า','สถานะ'],rows:[...S.po].sort((a,b)=>(b.no||'').localeCompare(a.no||'')).map(p=>[p.no||'',p.date||'',poSupShort(p),p.job||'',(p.lines||[]).length,poTotal(p),(PO_ST[p.status]||[''])[0]])}; }
 let poSelMode=false; const poSel=new Set();
 async function poDelSel(){
