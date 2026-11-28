@@ -2902,18 +2902,34 @@ function tPo(p){ const L=p.lines||[]; const pr=(k,t)=>{ const r=['',t,'','','','
     if(save>0) rows.push(pr('sub','สั่งตามร้านที่เลือก ประหยัดกว่าร้านราคาสูงสุด รวม '+n2(save)+' บาท')); }
   return {name:'ใบสั่งซื้อ '+p.no,title:'ใบสั่งซื้อ '+p.no,meta:[['วันที่',thDate(p.date)],['ผู้ขาย',poSupNames(L)||p.supplier||'-'],['อ้างอิงงาน',p.job||'-'],['สถานะ',(PO_ST[p.status]||[''])[0]]],head:['#','รหัส','รายการ','ร้าน','จำนวน','หน่วย','ราคา/หน่วย','รวม'],rows,foot:[['','','รวมทั้งสิ้น','','','','',poTotal(p)]]}; }
 function tPoList(){ return {name:'ใบสั่งซื้อ '+nowStamp(),title:'รายการใบสั่งซื้อ',head:['เลขที่','วันที่','ผู้ขาย','งาน','รายการ','มูลค่า','สถานะ'],rows:[...S.po].sort((a,b)=>(b.no||'').localeCompare(a.no||'')).map(p=>[p.no||'',p.date||'',p.supplier||'',p.job||'',(p.lines||[]).length,poTotal(p),(PO_ST[p.status]||[''])[0]])}; }
+let poSelMode=false; const poSel=new Set();
+async function poDelSel(){
+  const ids=[...poSel].filter(id=>S.po.some(x=>x.id===id)); if(!ids.length){ toast('ยังไม่ได้เลือกรายการ'); return; }
+  const nos=ids.map(id=>(S.po.find(x=>x.id===id)||{}).no).filter(Boolean).sort();
+  if(!await ask('ลบใบสั่งซื้อ '+ids.length+' ใบ ('+nos.slice(0,6).join(', ')+(nos.length>6?' …และอีก '+(nos.length-6)+' ใบ':'')+')? ลบแล้วกู้คืนไม่ได้ (ไม่กระทบสต๊อกที่รับเข้าไปแล้ว)','ลบ')) return;
+  let ok=0,fail=0; for(const id of ids){ if(await del('po',id)) ok++; else fail++; }
+  poSel.clear(); poSelMode=false; toast('ลบแล้ว '+ok+' ใบ'+(fail?' · ไม่สำเร็จ '+fail:'')); render();
+}
 function vPo(){
   const ed=canEdit('po');
   const list=[...S.po].filter(p=>poF==='all'||(poF==='open'?!['received','cancelled'].includes(p.status):p.status===poF)).sort((a,b)=>(b.no||'').localeCompare(a.no||''));
   const low=S.items.filter(i=>num(i.min)>0&&num(i.stock)<=num(i.min));
+  const sel=ed&&poSelMode; if(!sel) poSel.clear();
+  const allOn=list.length>0&&list.every(p=>poSel.has(p.id));
   return h('div',null,h('h1',null,'ใบสั่งซื้อ'),h('p',{class:'sub'},'สั่งซื้อจากร้านที่ราคาต่ำสุด เมื่อของมาถึงกด "รับของ" เพื่อเข้าสต๊อก (เลือกคลังได้)'),
     h('div',{class:'bar'},
       ed?h('button',{class:'btn primary',onclick:()=>poModal(null)},'+ ใบสั่งซื้อใหม่'):null,
       ed&&low.length?h('button',{class:'btn',onclick:poFromLow},'สร้างจากของใกล้หมด ('+low.length+')'):null,
-      ...[['open','ที่ยังไม่ปิด'],['received','รับครบ'],['cancelled','ยกเลิก'],['all','ทั้งหมด']].map(([k,t])=>h('button',{class:'btn'+(poF===k?' primary':''),onclick:()=>{ poF=k; render(); }},t)),
+      ...[['open','ที่ยังไม่ปิด'],['received','รับครบ'],['cancelled','ยกเลิก'],['all','ทั้งหมด']].map(([k,t])=>h('button',{class:'btn'+(poF===k?' primary':''),onclick:()=>{ poF=k; poSel.clear(); render(); }},t)),
+      ed&&list.length?h('button',{class:'btn'+(sel?' danger':''),onclick:()=>{ poSelMode=!poSelMode; poSel.clear(); render(); }},sel?'ยกเลิกการเลือก':'🗑 เลือกเพื่อลบ'):null,
       exportBtns(tPoList)),
-    list.length?h('div',{class:'tablewrap'},h('table',null,h('tr',null,h('th',null,'เลขที่'),h('th',null,'วันที่'),h('th',null,'ผู้ขาย'),h('th',null,'งาน'),h('th',{class:'num'},'รายการ'),h('th',{class:'num'},'มูลค่า'),h('th',null,'สถานะ'),h('th',null,'')),
-      list.map(p=>{ const st=PO_ST[p.status]||PO_ST.draft; return h('tr',null,h('td',{class:'mono'},p.no),h('td',null,thDate(p.date)),h('td',null,p.supplier||'-'),h('td',null,p.job||''),h('td',{class:'num'},(p.lines||[]).length),h('td',{class:'num'},n2(poTotal(p))),h('td',null,h('span',{class:'pill '+st[1]},st[0])),h('td',null,h('button',{class:'btn small',onclick:()=>poModal(p)},'เปิด'))); }))):h('div',{class:'empty'},'ยังไม่มีใบสั่งซื้อ — สร้างจากใบเบิกที่ "ไม่มีของในสต็อก" หรือจากของใกล้หมด'));
+    sel?h('div',{class:'bar',style:'background:#fdecea;border:1px solid #f3b8b0;border-radius:8px;padding:8px 10px'},
+      h('span',null,'โหมดลบ — ติ๊กเลือกใบที่ต้องการลบ'),
+      h('button',{class:'btn small',onclick:()=>{ if(allOn) list.forEach(p=>poSel.delete(p.id)); else list.forEach(p=>poSel.add(p.id)); render(); }},allOn?'ยกเลิกเลือกทั้งหมด':'เลือกทั้งหมด ('+list.length+')'),
+      h('button',{class:'btn small danger',disabled:!poSel.size,onclick:poDelSel},'ลบที่เลือก ('+poSel.size+')')):null,
+    list.length?h('div',{class:'tablewrap'},h('table',null,h('tr',null,sel?h('th',{style:'width:34px'},''):null,h('th',null,'เลขที่'),h('th',null,'วันที่'),h('th',null,'ผู้ขาย'),h('th',null,'งาน'),h('th',{class:'num'},'รายการ'),h('th',{class:'num'},'มูลค่า'),h('th',null,'สถานะ'),h('th',null,'')),
+      list.map(p=>{ const st=PO_ST[p.status]||PO_ST.draft; const tg=()=>{ if(poSel.has(p.id)) poSel.delete(p.id); else poSel.add(p.id); render(); };
+        return h('tr',{style:sel&&poSel.has(p.id)?'background:#fdecea':'',onclick:sel?tg:null},sel?h('td',null,h('input',{type:'checkbox',checked:poSel.has(p.id),'aria-label':'เลือก '+p.no,onclick:e=>e.stopPropagation(),onchange:tg})):null,h('td',{class:'mono'},p.no),h('td',null,thDate(p.date)),h('td',null,p.supplier||'-'),h('td',null,p.job||''),h('td',{class:'num'},(p.lines||[]).length),h('td',{class:'num'},n2(poTotal(p))),h('td',null,h('span',{class:'pill '+st[1]},st[0])),h('td',null,sel?null:h('button',{class:'btn small',onclick:()=>poModal(p)},'เปิด'))); }))):h('div',{class:'empty'},'ยังไม่มีใบสั่งซื้อ — สร้างจากใบเบิกที่ "ไม่มีของในสต็อก" หรือจากของใกล้หมด'));
 }
 function poModal(src){
   const isNew=!src; const pre=S.settings.poPrefix||'PO';
